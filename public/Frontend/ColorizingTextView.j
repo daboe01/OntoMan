@@ -15,7 +15,8 @@ var  _regexColors;
                          '2s':  [ /<MED>(.+?)<.MED>/gi,            [CPColor colorWithHexString:"BEBADA"] ],
                          '7s':  [ /<ANATOM>(.+?)<.ANATOM>/gi,      [CPColor colorWithHexString:"FB8072"] ],
                          '4s':  [ /<LOC>(.+?)<.LOC+>/gi,           [CPColor colorWithHexString:"FB8072"] ],
-                         '5s':  [ /<DIAG>(.+?)<.DIAG>/gi,          [CPColor colorWithHexString:"80B1D3"] ]
+                         '5s':  [ /<DIAG>(.+?)<.DIAG>/gi,          [CPColor colorWithHexString:"80B1D3"] ],
+                         '6s':  [ /<AD.>(.+?)<.AD.>/gi,            [CPColor colorWithHexString:"FDB462"] ]
                         };
 }
 

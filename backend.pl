@@ -61,9 +61,9 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<[^>]+>(beidseits|beids\.?|bds\.?)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
     $text =~s/<[^>]+>(rechts)<[^>]+>/<LOC>RA<\/LOC>/ogsi;
     $text =~s/<[^>]+>(links)<[^>]+>/<LOC>LA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|^tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
+    $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|^tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?|medien)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
     $text =~s/<[^>]+>([^>]+(aris|ilis|atus|ilata|amatus|ectus|ecta|piens|sicca))<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|vital|stumpf|randscharf)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
+    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|vital[ersmn]+|stumpf[ersmn]+|randscharf[ersmn]+|reizfrei[ersmn]+|leer[ersmn]+|trocken[ersmn]+|[^>]+ient|nasal|temporal|viel[ersmn]+|wenig[ersmn]+|anliegend[ersmn]+|gestaucht[ersmn]+|gestippt[ersmn]+|schlecht[ersmn]+|bess[ersmn]+)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
     $text =~s/<[NF].>([^>]+verschluss|[ck]atara[^>]+|[^>]*amotio[^>]*|[^>]*ablösun[gen]+|[^>]*itis|[^>]*ose|[^>]*generation|amd|cmv|CCS|smd[^>]*vaskularisation|morbus[^>]|[^>]*ödem|[^>]*dekompensation|[^>]+befund|[^>]*un[gen]+|[^>]*erkrankun[gen]+|[^>]*störun[gen]+|[^>]*ul[kcusera]+|[^>]*zündun[gen]+|[^>]*schielen|[^>]*opie|[^>]*mus|[^>]*star|[^>]*opie|[^>]*narbe|[^>]*iom|[^>]*gium|[^>]*cula|[^>]*phakie|[^>]*tion|[^>]*tio[en]+|[^>]*ophie|[^>]*tonie|[^>]*athie|[^>]*kom|[^>]*ämie|[^>]*ression|[^>]*nom|[^>]*giom|[^>]*foram[ensia]+|[^>]*osis|[^>]*osie|[^>]*nävus|[^>]*-riss|POWG|PCOWG|[^>]*illom|[^>]*iasie[n]?|[^>]*konus|[^>]*globus|[^>]*pathi[ea]|[^>]*syndrom|[^>]*response|[^>]-schub|[^>]chien|[^>]*skotom|VAV|CNV|[^>]*reaktion|[^>]*lyse|[^>]*sis|[^>]*omie|[^>]*keit|[^>]*kung|[^>]+-Ca|[^>]+phom|[^>]+olie[^>]+vus|[^>]+nävi|[^>]+igung|[^>]+sfall|[^>]+plex|MS|[^>]+ese|[^>]sion|[^>]malie|[^>]malazie|[^>]osi[ones]+|[^>]plasie|pex|[^>]*zion|[^>]*olum|[^>]*chstand|[^>]*iefstand|rop|[^>]*stom|adhs|[^>]*loch|[^>]*infarkt|[^>]*penie|[^>]*zytose[^>]*areale|Telangiektasien|[^>]pathie|[^>]ckage)<\/[NF].>/<DIAG>$1<\/DIAG>/ogsi;
     $text =~s/<[^>]+>cornea<[^>]+>\s+<[^>]+>guttata<[^>]+>/<DIAG>Cornea guttata<\/DIAG>/ogsi;
     $text =~s/<[^>]+>diabetes<[^>]+>\s+<[^>]+>mellitus<[^>]+>/<DIAG>Diabetes mellitus<\/DIAG>/ogsi;
@@ -75,7 +75,7 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung|VAA)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
     $text =~s/<[^>]+>(EYLEA[^>]*|fotil|dotrav|trusopt|clonid|mitomycin|azopt|avastin|lucentis|[^>]+olol|Timophtal|valtrex|aciclovir|floxal|vori[ck]onazol|vexol|inflanefran[^>]*|dexa[^>]*|xalatan|travatan|Mar[ck]umar|plavix|xarelto|metformin|ciclosporin|decortin|prednisolon|amiodaron|Tamsulosin|Penicillin|Cefuroxim|ganfort|Triamcinolon|lumigan|Metothrexat|[^>]+azol|ASS)<[^>]+>/<MED>$1<\/MED>/ogsi;
     $text =~s/<[^>]+>([^>]+)<[^>]+>\s*<[^>]+>AT<[^>]+>/<MED>$1<\/MED>/ogsi;
-    $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|pentacam)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
+    $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|pentacam|orbscan|amsler)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
 
     $text =~s/\s+\.\s+/.<BREAK>\n<\/BREAK>/ogsi;
     # $text =~s/\s+([,])\s+/$1<BREAK> /ogsi;
@@ -113,9 +113,9 @@ helper extract_entities => sub { my ($self, $pk, $text)=@_;
             my ($pre, $mid, $post)=$_=~/^([^A-Z]*)([A-Z\|]+)([^A-Z]*)/o;
             $mid = join '|', map {$slc{$_} || 'ZZZ'} split /\|/o, $mid ;
             "$pre($mid)$post"
-            } split / /,$query;
+        } split / /,$query;
         my @words;
-        warn $query;
+
         while($result=~/$query/gs)  # let perl do the heavy lifting to make this grammar work
         {
             my ($start_position, $end_position) = ($-[0] / 3, ($+[0] - 1) / 3);

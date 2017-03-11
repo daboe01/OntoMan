@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!DOCTYPE gsmarkup>
+<gsmarkup>
+
+<objects>
+  <sortDescriptor id="by_name" key="name"/>
+  <sortDescriptor id="by_id" key="id" numeric="YES"/>
+
+    <arrayController id="documents_controller" entity="document" autoFetch="YES" sortDescriptor="by_name"/>
+    <arrayController id="diagnoses_controller" entity="extracted_diagnoses" valueBinding="documents_controller.selection.diagnoses"/>
+</objects>
+
+<entities>
+    <entity id="document" store="#CPOwner.store">
+        <column name="id" primaryKey="YES"/>
+        <column name="name"/>
+        <column name="content"/>
+        <relationship type="toMany" name="diagnoses" bindingColumn="id"  targetColumn="idletter" target="extracted_diagnoses"/>
+    </entity>
+    <entity id="extracted_diagnoses" store="#CPOwner.store">
+        <column name="id" primaryKey="YES"/>
+        <column name="idletter"/>
+        <column name="name"/>
+        <column name="content"/>
+    </entity>
+</entities>
+
+<connectors>
+    <outlet source="#CPOwner" target="documents_controller" label="documentsController"/>
+    <outlet source="#CPOwner" target="diagnoses_controller" label="diagnosesController"/>
+</connectors>
+
+
+</gsmarkup>

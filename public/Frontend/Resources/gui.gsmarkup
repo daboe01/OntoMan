@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<!DOCTYPE gsmarkup>
+<gsmarkup>
+
+<objects>
+
+<window bridge="YES" id="mainwindow" delegate="#CPOwner">
+     <hbox>
+        <scrollView hasHorizontalScroller="NO" width="250" halign="min">
+            <tableView zebra="yes" id="sendings_tv" valueBinding="#CPOwner.documentsController" allowsMultipleSelection="NO">
+               <tableColumn identifier="name" title="name"  width="150"  editable="NO"/>
+            </tableView>
+        </scrollView>
+        <vbox>
+            <hbox><switchButton target="#CPOwner" id="tagsswitch" action="toggleTags:"/><label halign="left" valign="center">Tags verstecken</label></hbox>
+
+            <scrollView hasHorizontalScroller="NO">
+                <colorizingTextView editable="YES" id="textview" delegate="#CPOwner" backgroundColor="white" valueBinding="#CPOwner.documentsController.selection.content"/>
+            </scrollView>
+            <scrollView hasHorizontalScroller="NO">
+                <tableView valueBinding="#CPOwner.diagnosesController" allowsMultipleSelection="NO">
+                    <tableColumn identifier="name" title="name" width="60" editable="NO"/>
+                    <tableColumn identifier="content" title="content" editable="NO"/>
+                </tableView>
+            </scrollView>
+        </vbox>
+     </hbox>
+</window>
+
+
+</objects>
+
+
+<connectors>
+    <outlet source="CPOwner" target="mainmindow" label="mainWindow"/>
+    <outlet source="CPOwner" target="textview" label="textView"/>
+    <outlet source="CPOwner" target="tagsswitch" label="tagsSwitch"/>
+</connectors>
+
+
+</gsmarkup>

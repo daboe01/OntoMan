@@ -15,6 +15,8 @@ use Mojolicious::Plugin::RenderFile;
 use Encode;
 use Mojo::JSON qw(decode_json encode_json);
 
+no warnings 'uninitialized';
+
 plugin 'database', {
         databases => {
             db=>{
@@ -56,10 +58,12 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<[^>]+>rechte[snm]<[^>]+>\s+<[^>]+>Aug[esn]+<[^>]+>/<LOC>RA<\/LOC>/ogsi;
     $text =~s/<[^>]+>linke[snm]<[^>]+>\s+<[^>]+>Aug[esn]+<[^>]+>/<LOC>LA<\/LOC>/ogsi;
      $text =~s/<[^>]+>beide[n]?<[^>]+>\s+<[^>]+>Augen<[^>]+>/<LOC>BA<\/LOC>/ogsi;
-     $text =~s/<[^>]+>(beidseits|beids\.?|bds\.?)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
+    $text =~s/<[^>]+>(beidseits|beids\.?|bds\.?)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
+    $text =~s/<[^>]+>(rechts)<[^>]+>/<LOC>RA<\/LOC>/ogsi;
+    $text =~s/<[^>]+>(links)<[^>]+>/<LOC>LA<\/LOC>/ogsi;
     $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|^tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
     $text =~s/<[^>]+>([^>]+(aris|ilis|atus|ilata|amatus|ectus|ecta|piens|sicca))<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[^>]+>(o[ck]ult[ernm]+|multipl[ernms]+|vital|stumpf|randscharf)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
+    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|vital|stumpf|randscharf)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
     $text =~s/<[NF].>([^>]+verschluss|[ck]atara[^>]+|[^>]*amotio[^>]*|[^>]*ablösun[gen]+|[^>]*itis|[^>]*ose|[^>]*generation|amd|cmv|CCS|smd[^>]*vaskularisation|morbus[^>]|[^>]*ödem|[^>]*dekompensation|[^>]+befund|[^>]*un[gen]+|[^>]*erkrankun[gen]+|[^>]*störun[gen]+|[^>]*ul[kcusera]+|[^>]*zündun[gen]+|[^>]*schielen|[^>]*opie|[^>]*mus|[^>]*star|[^>]*opie|[^>]*narbe|[^>]*iom|[^>]*gium|[^>]*cula|[^>]*phakie|[^>]*tion|[^>]*tio[en]+|[^>]*ophie|[^>]*tonie|[^>]*athie|[^>]*kom|[^>]*ämie|[^>]*ression|[^>]*nom|[^>]*giom|[^>]*foram[ensia]+|[^>]*osis|[^>]*osie|[^>]*nävus|[^>]*-riss|POWG|PCOWG|[^>]*illom|[^>]*iasie[n]?|[^>]*konus|[^>]*globus|[^>]*pathi[ea]|[^>]*syndrom|[^>]*response|[^>]-schub|[^>]chien|[^>]*skotom|VAV|CNV|[^>]*reaktion|[^>]*lyse|[^>]*sis|[^>]*omie|[^>]*keit|[^>]*kung|[^>]+-Ca|[^>]+phom|[^>]+olie[^>]+vus|[^>]+nävi|[^>]+igung|[^>]+sfall|[^>]+plex|MS|[^>]+ese|[^>]sion|[^>]malie|[^>]malazie|[^>]osi[ones]+|[^>]plasie|pex|[^>]*zion|[^>]*olum|[^>]*chstand|[^>]*iefstand|rop|[^>]*stom|adhs|[^>]*loch|[^>]*infarkt|[^>]*penie|[^>]*zytose[^>]*areale|Telangiektasien|[^>]pathie|[^>]ckage)<\/[NF].>/<DIAG>$1<\/DIAG>/ogsi;
     $text =~s/<[^>]+>cornea<[^>]+>\s+<[^>]+>guttata<[^>]+>/<DIAG>Cornea guttata<\/DIAG>/ogsi;
     $text =~s/<[^>]+>diabetes<[^>]+>\s+<[^>]+>mellitus<[^>]+>/<DIAG>Diabetes mellitus<\/DIAG>/ogsi;
@@ -68,12 +72,12 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<[^>]+>(art|arterielle|a)<[^>]+>\s+\.?\s*<[^>]+>hypertonie<[^>]+>/<DIAG>Bluthochdruck<\/DIAG>/ogsi;
 
     $text =~s/<[^>]+>(vorgeschichte|beurteilung|epikrise||befund[e]?|operation|allgemein)<[^>]+>\s+:/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
-    $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
+    $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung|VAA)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
     $text =~s/<[^>]+>(EYLEA[^>]*|fotil|dotrav|trusopt|clonid|mitomycin|azopt|avastin|lucentis|[^>]+olol|Timophtal|valtrex|aciclovir|floxal|vori[ck]onazol|vexol|inflanefran[^>]*|dexa[^>]*|xalatan|travatan|Mar[ck]umar|plavix|xarelto|metformin|ciclosporin|decortin|prednisolon|amiodaron|Tamsulosin|Penicillin|Cefuroxim|ganfort|Triamcinolon|lumigan|Metothrexat|[^>]+azol|ASS)<[^>]+>/<MED>$1<\/MED>/ogsi;
     $text =~s/<[^>]+>([^>]+)<[^>]+>\s*<[^>]+>AT<[^>]+>/<MED>$1<\/MED>/ogsi;
     $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|pentacam)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
 
-    $text =~s/\s+\.\s+/.\n<BREAK>/ogsi;
+    $text =~s/\s+\.\s+/.<BREAK>\n<\/BREAK>/ogsi;
     # $text =~s/\s+([,])\s+/$1<BREAK> /ogsi;
     $text =~s/\s+([:,])\s+/$1 /ogsi;
     $text =~s/\n\s+/\n/ogsi;
@@ -88,9 +92,9 @@ helper extract_entities => sub { my ($self, $pk, $text)=@_;
         my $value = shift;
         my $out = shift;
         my $pk = shift;
-        return '' if $key=~/ART|KON|STRUCTURE|APPR|PPER/ || $value=~/^.?\s*$|^untersuchung|^Durchführung|Vorstellung|^Operation|^XX+|^\/.+/ios;
         state $i = 0;
-        push @$out, {id=>$i++, idletter => $pk, name => $key, content => $value};
+        push @$out, {id=>$i, idletter => $pk, name => $key, content => $value} if $key!~/ART|KON|STRUCTURE|APPR|PPER/ && $value!~/^.?\s*$|^untersuchung|^Durchführung|Vorstellung|^Operation|^XX+|^\/.+/ios;
+        $i++;
         return '';
     }
     # this is a mini-grammar on the entity-names that supports full regex-syntax (e.g. 'LOC* TIATTR* CERTAINTY* ADJA* ADJD* DIAG|ANATOM ADJA* ADJD* (?<!BREAK)')
@@ -106,17 +110,12 @@ helper extract_entities => sub { my ($self, $pk, $text)=@_;
             $result.=$slc{$_};
         }
         $query = join '', map {
-                my ($pre, $mid, $post)=$_=~/^([^A-Z]*)([A-Z\|]+)([^A-Z]*)/o;
-            if ($mid =~/\|/o)  # support for regex-or's
-                {
-                    $mid = join '|', map {$slc{$_} || 'ZZZ'} split /\|/o, $mid ;
-                    "$pre($mid)$post"
-                } else # map entity to three-letter codes
-                {   $pre.'('.($slc{$mid} || 'ZZZ').')'.$post
-                }
+            my ($pre, $mid, $post)=$_=~/^([^A-Z]*)([A-Z\|]+)([^A-Z]*)/o;
+            $mid = join '|', map {$slc{$_} || 'ZZZ'} split /\|/o, $mid ;
+            "$pre($mid)$post"
             } split / /,$query;
         my @words;
-
+        warn $query;
         while($result=~/$query/gs)  # let perl do the heavy lifting to make this grammar work
         {
             my ($start_position, $end_position) = ($-[0] / 3, ($+[0] - 1) / 3);

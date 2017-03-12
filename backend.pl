@@ -43,7 +43,7 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<..>(.)<...>/$1/ogsi;
     $text =~s/<[^>]+>Z\.n<[^>]+>\s+\.\s+/<TIATTR> Zustand nach <\/TIATTR>/ogsi;
     $text =~s/<[^>]+>Z\.<[^>]+>\s+<[^>]+>n<[^>]+>\s+\./<TIATTR> Zustand nach <\/TIATTR>/ogsi;
-    $text =~s/<NE>Aktuell<\/NE>\s+:/<TIATTR> Aktuell <\/TIATTR>/ogsi;
+    $text =~s/<[^>]+>Aktuell<[^>]*>[\s:]+/<TIATTR> Aktuell <\/TIATTR>/ogsi;
     $text =~s/<[^>]+>V\.a<[^>]+>\s+\.\s+/<CERTAINTY> Verdacht auf <\/CERTAINTY>/ogsi;
     $text =~s/<[^>]+>V\.<[^>]+>\s+a\s+\.s+/<CERTAINTY> Verdacht auf <\/CERTAINTY>/ogsi;
     $text =~s/<[^>]+>a\.e<[^>]+>\s+\.\s+/<CERTAINTY> Am ehesten <\/CERTAINTY>/ogsi;
@@ -52,7 +52,7 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<[^>]+>([^>]+?(str|strasse|straße|platz|weg))<\/[^>]+>[\s\.]*<CARD>([^>]+?)<\/CARD>/<STR>$1 $3<\/STR>/ogsi;
     $text =~s/<CARD>(0761[^>]+?)<\/CARD>/<TEL>$1 $2<\/TEL>/ogsi;
     $text =~s/<[^>]+>(kolleg[^>]+|FRAU|HERR[N]?)<[^>]+>/<ANREDE>$1<\/ANREDE>/ogsi;
-    $text =~s/<[^>]+>((Prof|Dr|med[\.]?)[^>]*)<[^>]+>[\s\.]*/<PTITLE>$1<\/PTITLE>/ogsi;
+    $text =~s/<[^>]+>((Prof[\.]?|Dr[\.]?|med[\.]?))<[^>]+>[\s\.]*/<PTITLE>$1<\/PTITLE>/ogsi;
 
     $text =~s/<N.>([BRL]A)<\/N.>/<LOC>$1<\/LOC>/ogsi;
     $text =~s/<[^>]+>rechte[snm]<[^>]+>\s+<[^>]+>Aug[esn]+<[^>]+>/<LOC>RA<\/LOC>/ogsi;
@@ -62,23 +62,23 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<[^>]+>(r(.)l)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
     $text =~s/<[^>]+>(rechts)<[^>]+>/<LOC>RA<\/LOC>/ogsi;
     $text =~s/<[^>]+>(links)<[^>]+>/<LOC>LA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|sehner[^>]+|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|^tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?|medien|bereich)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
-    $text =~s/<[^>]+>([^>]+(aris|ilis|atus|ilata|amatus|ectus|ecta|piens|führend))<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|vital[ersmn]+|stumpf[ersmn]+|randscharf[ersmn]+|mild[ersmn]+|reizfrei[ersmn]+|reizarm[ersmn]+|leer[ersmn]+|feucht[ersmn]+|trock[ersmn]+|[^>]+ient|nasal|temporal|viel[ersmn]+|wenig[ersmn]+|anliegend[ersmn]+|gestaucht[ersmn]+|gestippt[ersmn]+|schlecht[ersmn]+|bess[ersmn]+|sicca|atö[ersmn]+)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[NF].>([^>]+verschluss|[ck]atara[^>]+|[^>]*amotio[^>]*|[^>]*ablösun[gen]+|[^>]*itis|[^>]*ose|[^>]*generation|amd|cmv|CCS|smd[^>]*vaskularisation|morbus[^>]|[^>]*ödem|[^>]*dekompensation|[^>]+befund|[^>]*un[gen]+|[^>]*erkrankun[gen]+|[^>]*störun[gen]+|[^>]*ul[kcusera]+|[^>]*zündun[gen]+|[^>]*schielen|[^>]*opie|[^>]*mus|[^>]*star|[^>]*opie|[^>]*narbe|[^>]*iom|[^>]*gium|[^>]*cula|[^>]*phakie|[^>]*tion|[^>]*tio[en]+|[^>]*ophie|[^>]*tonie|[^>]*athie|[^>]*kom|[^>]*ämie|[^>]*ression|[^>]*nom|[^>]*giom|[^>]*foram[ensia]+|[^>]*osis|[^>]*osie|[^>]*nävus|[^>]*-riss|POWG|PCOWG|[^>]*illom|[^>]*iasie[n]?|[^>]*konus|[^>]*globus|[^>]*pathi[ea]|[^>]*syndrom|[^>]*response|[^>]-schub|[^>]chie[n]?|[^>]*skotom[e]?|VAV|CNV|[^>]*reaktio[en]+|[^>]*lys[en]+|[^>]*sis|[^>]*omie|[^>]*keit|[^>]*kung|[^>]+-Ca|[^>]+phom|[^>]+olie[^>]+vus|[^>]+nävi|[^>]+igung|[^>]+sfall|[^>]+plex|MS|[^>]sion|[^>]malie|[^>]malazie|[^>]osi[ones]+|[^>]plasie|pex|[^>]*zion|[^>]*olum|[^>]*chstand|[^>]*iefstand|rop|[^>]*stom|adhs|[^>]*loch|[^>]*infarkt|[^>]*penie|[^>]*zytose[^>]*areale|Telangiektasien|[^>]pathie|[^>]ckage)<\/[NF].>/<DIAG>$1<\/DIAG>/ogsi;
+    $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|sehner[^>]+|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|Fundus|tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?|medien|bereich|oberfläche|ekn|f[aä]den|filterkissen|bleb|iridektomie|PI)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
+    $text =~s/<[^>]+>([^>]+(aris|ilis|atus|ilata|amatus|ectus|ecta|piens|führend[ersmn]+|liche[ersmn]+|kannt[ersmn]+|minent[ersmn]+))<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
+    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|schräg[ernms]+|vital[ersmn]*|stumpf[ersmn]+|randscharf[ersmn]*|erbreit[ersmn]+|mild[ersmn]+|reizfrei[ersmn]*|reizarm[ersmn]*|leer[ersmn]*|feucht[ersmn]*|trock[ersmn]+|[^>]+ient|nasal|temporal|viel[ersmn]+|wenig[ersmn]+|anliegend[ersmn]*|gestaucht[ersmn]+|gestippt[ersmn]+|schlecht[ersmn]+|bess[ersmn]+|sicca|atö[ersmn]+|[^>]+bessert[ersmn]+|[^>]+eschloss[ersmn]+|peripher[ersmn]+|[^>]*tief[ersmn]*|fest[ersmn]+|[^>]*lock[ersmn]+|adaptiert[ersmn]*|aufgelock[ertsmn]*)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
+    $text =~s/<[NF].>([^>]+verschluss|[ck]atara[^>]+|[^>]*amotio[^>]*|[^>]*ablösun[gen]+|[^>]*itis|[^>]*ose|[^>]*generation|amd|cmv|CCS|smd[^>]*vaskularisation|morbus[^>]|[^>]*ödem|[^>]*dekompensation|[^>]+befund|[^>]*un[gen]+|[^>]*erkrankun[gen]+|[^>]*störun[gen]+|[^>]*ul[kcusera]+|[^>]*zündun[gen]+|[^>]*schielen|[^>]*opie|[^>]*mus|[^>]*star|[^>]*opie|[^>]*narbe|[^>]*iom|[^>]*gium|[^>]*cula|[^>]*phakie|[^>]*tion|[^>]*tio[en]+|[^>]*ophie|[^>]*tonie|[^>]*athie|[^>]*kom|[^>]*ämie|[^>]*ression|[^>]*nom|[^>]*giom|[^>]+foram[ensia]+|[^>]*osis|[^>]*osie|[^>]*nävus|[^>]*-riss|POWG|PCOWG|[^>]*illom|[^>]*iasie[n]?|[^>]*konus|[^>]*globus|[^>]*pathi[ea]|[^>]*syndrom|[^>]*response|[^>]-schub|[^>]chie[n]?|[^>]*skotom[e]?|VAV|CNV|[^>]*reaktio[en]+|[^>]*lys[en]+|[^>]*sis|[^>]*omie|[^>]*keit|[^>]*kung|[^>]+-Ca|[^>]+phom|[^>]+olie[^>]+vus|[^>]+nävi|[^>]+igung|[^>]+sfall|[^>]+plex|MS|[^>]sion|[^>]malie|[^>]malazie|[^>]osi[ones]+|[^>]plasie|pex|[^>]*zion|[^>]*olum|[^>]*chstand|[^>]*iefstand|rop|[^>]*stom|adhs|[^>]*loch|[^>]*infarkt|[^>]*penie|[^>]*zytose[^>]*areale|Telangiektasien|[^>]+pathie|[^>]ckage|[^>]+membran|[^>]*angst)<\/[NF].>/<DIAG>$1<\/DIAG>/ogsi;
     $text =~s/<[^>]+>cornea<[^>]+>\s+<[^>]+>guttata<[^>]+>/<DIAG>Cornea guttata<\/DIAG>/ogsi;
     $text =~s/<[^>]+>diabetes<[^>]+>\s+<[^>]+>mellitus<[^>]+>/<DIAG>Diabetes mellitus<\/DIAG>/ogsi;
     $text =~s/<[^>]+>multiple<[^>]+>\s+<[^>]+>sklerose<[^>]+>/<DIAG>Multiple sklerose<\/DIAG>/ogsi;
     $text =~s/<[^>]+>morbus<[^>]+>\s+<[^>]+>(<[^>]+)>/<DIAG>$1<\/DIAG>/ogsi;
     $text =~s/<[^>]+>(art|arterielle|a)<[^>]+>\s+\.?\s*<[^>]+>hypertonie<[^>]+>/<DIAG>Bluthochdruck<\/DIAG>/ogsi;
 
-    $text =~s/<[^>]+>(vorgeschichte|beurteilung|epikrise||befund[e]?|operation|allgemein)<[^>]+>\s+:/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
-    $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung|VAA|fachbereich|vorgeschichte)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
-    $text =~s/<[^>]+>(EYLEA[^>]*|fotil|dotrav|trusopt|clonid|mitomycin|azopt|avastin|lucentis|[^>]+olol|Timophtal|valtrex|aciclovir|floxal|vori[ck]onazol|vexol|inflanefran[^>]*|dexa[^>]*|xalatan|travatan|Mar[ck]umar|plavix|xarelto|metformin|ciclosporin|decortin|prednisolon|amiodaron|Tamsulosin|Penicillin|Cefuroxim|ganfort|Triamcinolon|lumigan|Metothrexat|[^>]+azol[^>]+|ASS|glaupax|acemit|diamox|sandimmun|myfortic)<[^>]+>/<MED>$1<\/MED>/ogsi;
+    $text =~s/<[^>]+>(vorgeschichte|beurteilung|epikrise|kontrolluntersuchung|befund[e]?|operation|allgemein)<[^>]+>\s+:/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
+    $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung|VAA|vorderabschnitt[e]?|fachbereich|vorgeschichte)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
+    $text =~s/<[^>]+>(EYLEA[^>]*|fotil|dotrav|[^>]+sopt|clonid|mitomycin|azopt|avastin|lucentis|[^>]+olol|Timophtal|valtrex|aciclovir|floxal|vori[ck]onazol|vexol|inflanefran[^>]*|dexa[^>]*|xalatan|travatan|Mar[ck]umar|plavix|xarelto|metformin|ciclosporin|decortin|predni[^>]*|amiodaron|Tamsulosin|Penicillin|Cefuroxim|ganfort|Triamcinolon|lumigan|Metothrexat|[^>]+azol[^>]+|ozurdex[^>]+|alphagan[^>]+|combigan[^>]+|cornerege[^>]+|ASS[^>]*|clopid[^>]*|glaupax|godamed|acemit|diamox|sandimmun|myfortic)<[^>]+>/<MED>$1<\/MED>/ogsi;
     $text =~s/<[^>]+>([^>]+)<[^>]+>\s*<[^>]+>AT<[^>]+>/<MED>$1<\/MED>/ogsi;
-    $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|pentacam|orbscan|amsler|augenstellung|doppelbildschema)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
+    $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|spectralis|pentacam|orbscan|amsler|augenstellung|doppelbildschema|Pupillomotorik|Abdecktest|Stereosehen|Motilität|Vorderabschnitte)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
 
-    $text =~s/<[^>]+>([^>]*infiltra[ten]+|pitat[en]+|blutung[en]+|narb[en]+|ung[en]|enz[en]+|[^>]*zellen|lichtweg|[^>]*atrophie|reflexe|doppelbilder|[^>]+herde|exsudat[ens]+|[^>]+areal|prominenz|pigment)<[^>]+>/<BEFUND>$1<\/BEFUND>/ogsi;
+    $text =~s/<[^>]+>([^>]*infiltra[ten]+|pitat[en]+|[^>]*beschläge[en]+|narb[en]+|enz[en]+|[^>]*zellen|ma[CK]rophagen|lichtweg|[^>]*atrophie|reflexe|doppelbilder|[^>]+herde[n]?|exsudat[ens]*|[^>]+areal[ens]*|[^>]+[k]ung[en]*|prominenz[en]*|pigment[ens]*|[^>]*koagel[ns]*|[^>]+defekte[ns]*|fibrin[ens]*|injiziert[ens]*|druse[n]?|shuntgefäß[en]*|Ex[ck]av[^>]+|foram[ensia]+|glitzern|flüssigkeit|staphylom|[^>]*verschiebung[en]*)<[^>]+>/<BEFUND>$1<\/BEFUND>/ogsi;
 
     $text =~s/\s+\.\s+/.<BREAK>\n<\/BREAK>/ogsi;
     # $text =~s/\s+([,])\s+/$1<BREAK> /ogsi;
@@ -96,7 +96,7 @@ helper extract_entities => sub { my ($self, $pk, $text, $query, $name, $idletter
         my $out = shift;
         my $pk = shift;
         state $i = 0;
-        push @$out, {id=>$i, idletter => $pk, name => $key, content => $value} if $key!~/ART|KON|STRUCTURE|APPR|PPER/ && $value!~/^.?\s*$|^untersuchung|^Durchführung|Vorstellung|^Operation|^XX+|^\/.+/ios;
+        push @$out, {id=>$i, idletter => $pk, name => $key, content => $value} if $key!~/ART|KON|APPR|PPER/ && $value!~/^.?\s*$|^untersuchung|^Durchführung|Vorstellung|^Operation|^XX+|^\/.+/ios;
         $i++;
         return '';
     }

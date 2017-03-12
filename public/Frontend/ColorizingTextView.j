@@ -13,11 +13,12 @@ var  _regexColors;
         _regexColors = @{
                          '1s':  [ /<N.>(.+?)<.N.>/gi,              [CPColor colorWithHexString:"8DD3C7"] ],
                          '2s':  [ /<MED>(.+?)<.MED>/gi,            [CPColor colorWithHexString:"BEBADA"] ],
-                         '7s':  [ /<ANATOM>(.+?)<.ANATOM>/gi,      [CPColor colorWithHexString:"FB8072"] ],
+                         '3s':  [ /<ANATOM>(.+?)<.ANATOM>/gi,      [CPColor colorWithHexString:"FB8072"] ],
                          '4s':  [ /<LOC>(.+?)<.LOC+>/gi,           [CPColor colorWithHexString:"FB8072"] ],
                          '5s':  [ /<DIAG>(.+?)<.DIAG>/gi,          [CPColor colorWithHexString:"80B1D3"] ],
                          '6s':  [ /<AD.>(.+?)<.AD.>/gi,            [CPColor colorWithHexString:"FDB462"] ],
-                         '7s':  [ /<befund>(.+?)<.befund>/gi,      [CPColor colorWithHexString:"B3DE69"] ]
+                         '7s':  [ /<BEFUND>(.+?)<.BEFUND>/gi,      [CPColor colorWithHexString:"B3DE69"] ],
+                         '8s':  [ /<[^>]+ATTR>(.+?)<[^>]+ATTR>/gi,     [CPColor colorWithHexString:"FCCDE5"] ]
                         };
 }
 

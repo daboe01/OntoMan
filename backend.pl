@@ -48,34 +48,37 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     $text =~s/<[^>]+>V\.<[^>]+>\s+a\s+\.s+/<CERTAINTY> Verdacht auf <\/CERTAINTY>/ogsi;
     $text =~s/<[^>]+>a\.e<[^>]+>\s+\.\s+/<CERTAINTY> Am ehesten <\/CERTAINTY>/ogsi;
 
-    $text =~s/<CARD>[0-9]{5}<\/CARD>\s+<N.>([^>]+)<\/N.>/<DP:ORT>$1<\/DP:ORT>/ogsi;
-    $text =~s/<[^>]+>([^>]+?(str|strasse|straße|platz|weg))<\/[^>]+>\s+\.?\s*<CARD>([^>]+?)<\/CARD>/<DP:STR>$1 $3<\/DP:STR>/ogsi;
-    $text =~s/<CARD>(0761[^>]+?)<\/CARD>/<DP:TEL>$1 $2<\/DP:TEL>/ogsi;
+    $text =~s/<CARD>[0-9]{5}<\/CARD>\s+<N.>([^>]+)<\/N.>/<ORT>$1<\/ORT>/ogsi;
+    $text =~s/<[^>]+>([^>]+?(str|strasse|straße|platz|weg))<\/[^>]+>[\s\.]*<CARD>([^>]+?)<\/CARD>/<STR>$1 $3<\/STR>/ogsi;
+    $text =~s/<CARD>(0761[^>]+?)<\/CARD>/<TEL>$1 $2<\/TEL>/ogsi;
     $text =~s/<[^>]+>(kolleg[^>]+|FRAU|HERR[N]?)<[^>]+>/<ANREDE>$1<\/ANREDE>/ogsi;
-    $text =~s/<[^>]+>((Prof|Dr|med[\.]?)[^>]*)<[^>]+>/<PTITLE>$1<\/PTITLE>/ogsi;
+    $text =~s/<[^>]+>((Prof|Dr|med[\.]?)[^>]*)<[^>]+>[\s\.]*/<PTITLE>$1<\/PTITLE>/ogsi;
 
     $text =~s/<N.>([BRL]A)<\/N.>/<LOC>$1<\/LOC>/ogsi;
     $text =~s/<[^>]+>rechte[snm]<[^>]+>\s+<[^>]+>Aug[esn]+<[^>]+>/<LOC>RA<\/LOC>/ogsi;
     $text =~s/<[^>]+>linke[snm]<[^>]+>\s+<[^>]+>Aug[esn]+<[^>]+>/<LOC>LA<\/LOC>/ogsi;
-     $text =~s/<[^>]+>beide[n]?<[^>]+>\s+<[^>]+>Augen<[^>]+>/<LOC>BA<\/LOC>/ogsi;
+    $text =~s/<[^>]+>beide[n]?<[^>]+>\s+<[^>]+>Augen<[^>]+>/<LOC>BA<\/LOC>/ogsi;
     $text =~s/<[^>]+>(beidseits|beids\.?|bds\.?)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
+    $text =~s/<[^>]+>(r(.)l)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
     $text =~s/<[^>]+>(rechts)<[^>]+>/<LOC>RA<\/LOC>/ogsi;
     $text =~s/<[^>]+>(links)<[^>]+>/<LOC>LA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|^tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?|medien)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
-    $text =~s/<[^>]+>([^>]+(aris|ilis|atus|ilata|amatus|ectus|ecta|piens|sicca))<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|vital[ersmn]+|stumpf[ersmn]+|randscharf[ersmn]+|reizfrei[ersmn]+|leer[ersmn]+|trocken[ersmn]+|[^>]+ient|nasal|temporal|viel[ersmn]+|wenig[ersmn]+|anliegend[ersmn]+|gestaucht[ersmn]+|gestippt[ersmn]+|schlecht[ersmn]+|bess[ersmn]+)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[NF].>([^>]+verschluss|[ck]atara[^>]+|[^>]*amotio[^>]*|[^>]*ablösun[gen]+|[^>]*itis|[^>]*ose|[^>]*generation|amd|cmv|CCS|smd[^>]*vaskularisation|morbus[^>]|[^>]*ödem|[^>]*dekompensation|[^>]+befund|[^>]*un[gen]+|[^>]*erkrankun[gen]+|[^>]*störun[gen]+|[^>]*ul[kcusera]+|[^>]*zündun[gen]+|[^>]*schielen|[^>]*opie|[^>]*mus|[^>]*star|[^>]*opie|[^>]*narbe|[^>]*iom|[^>]*gium|[^>]*cula|[^>]*phakie|[^>]*tion|[^>]*tio[en]+|[^>]*ophie|[^>]*tonie|[^>]*athie|[^>]*kom|[^>]*ämie|[^>]*ression|[^>]*nom|[^>]*giom|[^>]*foram[ensia]+|[^>]*osis|[^>]*osie|[^>]*nävus|[^>]*-riss|POWG|PCOWG|[^>]*illom|[^>]*iasie[n]?|[^>]*konus|[^>]*globus|[^>]*pathi[ea]|[^>]*syndrom|[^>]*response|[^>]-schub|[^>]chien|[^>]*skotom|VAV|CNV|[^>]*reaktion|[^>]*lyse|[^>]*sis|[^>]*omie|[^>]*keit|[^>]*kung|[^>]+-Ca|[^>]+phom|[^>]+olie[^>]+vus|[^>]+nävi|[^>]+igung|[^>]+sfall|[^>]+plex|MS|[^>]+ese|[^>]sion|[^>]malie|[^>]malazie|[^>]osi[ones]+|[^>]plasie|pex|[^>]*zion|[^>]*olum|[^>]*chstand|[^>]*iefstand|rop|[^>]*stom|adhs|[^>]*loch|[^>]*infarkt|[^>]*penie|[^>]*zytose[^>]*areale|Telangiektasien|[^>]pathie|[^>]ckage)<\/[NF].>/<DIAG>$1<\/DIAG>/ogsi;
+    $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|sehner[^>]+|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|^tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?|medien|bereich)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
+    $text =~s/<[^>]+>([^>]+(aris|ilis|atus|ilata|amatus|ectus|ecta|piens|führend))<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
+    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|vital[ersmn]+|stumpf[ersmn]+|randscharf[ersmn]+|mild[ersmn]+|reizfrei[ersmn]+|reizarm[ersmn]+|leer[ersmn]+|feucht[ersmn]+|trock[ersmn]+|[^>]+ient|nasal|temporal|viel[ersmn]+|wenig[ersmn]+|anliegend[ersmn]+|gestaucht[ersmn]+|gestippt[ersmn]+|schlecht[ersmn]+|bess[ersmn]+|sicca|atö[ersmn]+)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
+    $text =~s/<[NF].>([^>]+verschluss|[ck]atara[^>]+|[^>]*amotio[^>]*|[^>]*ablösun[gen]+|[^>]*itis|[^>]*ose|[^>]*generation|amd|cmv|CCS|smd[^>]*vaskularisation|morbus[^>]|[^>]*ödem|[^>]*dekompensation|[^>]+befund|[^>]*un[gen]+|[^>]*erkrankun[gen]+|[^>]*störun[gen]+|[^>]*ul[kcusera]+|[^>]*zündun[gen]+|[^>]*schielen|[^>]*opie|[^>]*mus|[^>]*star|[^>]*opie|[^>]*narbe|[^>]*iom|[^>]*gium|[^>]*cula|[^>]*phakie|[^>]*tion|[^>]*tio[en]+|[^>]*ophie|[^>]*tonie|[^>]*athie|[^>]*kom|[^>]*ämie|[^>]*ression|[^>]*nom|[^>]*giom|[^>]*foram[ensia]+|[^>]*osis|[^>]*osie|[^>]*nävus|[^>]*-riss|POWG|PCOWG|[^>]*illom|[^>]*iasie[n]?|[^>]*konus|[^>]*globus|[^>]*pathi[ea]|[^>]*syndrom|[^>]*response|[^>]-schub|[^>]chie[n]?|[^>]*skotom[e]?|VAV|CNV|[^>]*reaktio[en]+|[^>]*lys[en]+|[^>]*sis|[^>]*omie|[^>]*keit|[^>]*kung|[^>]+-Ca|[^>]+phom|[^>]+olie[^>]+vus|[^>]+nävi|[^>]+igung|[^>]+sfall|[^>]+plex|MS|[^>]sion|[^>]malie|[^>]malazie|[^>]osi[ones]+|[^>]plasie|pex|[^>]*zion|[^>]*olum|[^>]*chstand|[^>]*iefstand|rop|[^>]*stom|adhs|[^>]*loch|[^>]*infarkt|[^>]*penie|[^>]*zytose[^>]*areale|Telangiektasien|[^>]pathie|[^>]ckage)<\/[NF].>/<DIAG>$1<\/DIAG>/ogsi;
     $text =~s/<[^>]+>cornea<[^>]+>\s+<[^>]+>guttata<[^>]+>/<DIAG>Cornea guttata<\/DIAG>/ogsi;
     $text =~s/<[^>]+>diabetes<[^>]+>\s+<[^>]+>mellitus<[^>]+>/<DIAG>Diabetes mellitus<\/DIAG>/ogsi;
-    $text =~s/<[^>]+>multiple<[^>]+>\s+<[^>]+>sklerose<[^>]+>/<DIAG>MS<\/DIAG>/ogsi;
+    $text =~s/<[^>]+>multiple<[^>]+>\s+<[^>]+>sklerose<[^>]+>/<DIAG>Multiple sklerose<\/DIAG>/ogsi;
     $text =~s/<[^>]+>morbus<[^>]+>\s+<[^>]+>(<[^>]+)>/<DIAG>$1<\/DIAG>/ogsi;
     $text =~s/<[^>]+>(art|arterielle|a)<[^>]+>\s+\.?\s*<[^>]+>hypertonie<[^>]+>/<DIAG>Bluthochdruck<\/DIAG>/ogsi;
 
     $text =~s/<[^>]+>(vorgeschichte|beurteilung|epikrise||befund[e]?|operation|allgemein)<[^>]+>\s+:/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
-    $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung|VAA)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
-    $text =~s/<[^>]+>(EYLEA[^>]*|fotil|dotrav|trusopt|clonid|mitomycin|azopt|avastin|lucentis|[^>]+olol|Timophtal|valtrex|aciclovir|floxal|vori[ck]onazol|vexol|inflanefran[^>]*|dexa[^>]*|xalatan|travatan|Mar[ck]umar|plavix|xarelto|metformin|ciclosporin|decortin|prednisolon|amiodaron|Tamsulosin|Penicillin|Cefuroxim|ganfort|Triamcinolon|lumigan|Metothrexat|[^>]+azol|ASS)<[^>]+>/<MED>$1<\/MED>/ogsi;
+    $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung|VAA|fachbereich|vorgeschichte)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
+    $text =~s/<[^>]+>(EYLEA[^>]*|fotil|dotrav|trusopt|clonid|mitomycin|azopt|avastin|lucentis|[^>]+olol|Timophtal|valtrex|aciclovir|floxal|vori[ck]onazol|vexol|inflanefran[^>]*|dexa[^>]*|xalatan|travatan|Mar[ck]umar|plavix|xarelto|metformin|ciclosporin|decortin|prednisolon|amiodaron|Tamsulosin|Penicillin|Cefuroxim|ganfort|Triamcinolon|lumigan|Metothrexat|[^>]+azol[^>]+|ASS|glaupax|acemit|diamox|sandimmun|myfortic)<[^>]+>/<MED>$1<\/MED>/ogsi;
     $text =~s/<[^>]+>([^>]+)<[^>]+>\s*<[^>]+>AT<[^>]+>/<MED>$1<\/MED>/ogsi;
-    $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|pentacam|orbscan|amsler)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
+    $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|pentacam|orbscan|amsler|augenstellung|doppelbildschema)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
+
+    $text =~s/<[^>]+>([^>]*infiltra[ten]+|pitat[en]+|blutung[en]+|narb[en]+|ung[en]|enz[en]+|[^>]*zellen|lichtweg|[^>]*atrophie|reflexe|doppelbilder|[^>]+herde|exsudat[ens]+|[^>]+areal|prominenz|pigment)<[^>]+>/<BEFUND>$1<\/BEFUND>/ogsi;
 
     $text =~s/\s+\.\s+/.<BREAK>\n<\/BREAK>/ogsi;
     # $text =~s/\s+([,])\s+/$1<BREAK> /ogsi;
@@ -85,8 +88,8 @@ helper preprocess_text => sub { my ($self, $text)=@_;
     return $text;
 };
 
-helper extract_entities => sub { my ($self, $pk, $text)=@_;
-    my $out = [];
+helper extract_entities => sub { my ($self, $pk, $text, $query, $name, $idletter, $res)=@_;
+    my $content_array = [];
     sub _extract_entities{
         my $key = shift;
         my $value = shift;
@@ -97,38 +100,29 @@ helper extract_entities => sub { my ($self, $pk, $text)=@_;
         $i++;
         return '';
     }
+    $text =~s/<([^>]+)>\s*([^<]+)<[^>]+>\s*/_extract_entities($1, $2, $content_array, $pk)/gsei;
     # this is a mini-grammar on the entity-names that supports full regex-syntax (e.g. 'LOC* TIATTR* CERTAINTY* ADJA* ADJD* DIAG|ANATOM ADJA* ADJD* (?<!BREAK)')
-    sub _capture_entities{
-        my $query = shift;
-        my $content_array = shift;
-        my %slc = ('...' => '...');
-        my $entity = 'AAA';
-        my $result = '';
-        for (map { $_->{name} } (@$content_array))
-        {
-            $slc{$_}//= $entity++;;
-            $result.=$slc{$_};
-        }
-        $query = join '', map {
-            my ($pre, $mid, $post)=$_=~/^([^A-Z]*)([A-Z\|]+)([^A-Z]*)/o;
-            $mid = join '|', map {$slc{$_} || 'ZZZ'} split /\|/o, $mid ;
-            "$pre($mid)$post"
-        } split / /,$query;
-        my @words;
-
-        while($result=~/$query/gs)  # let perl do the heavy lifting to make this grammar work
-        {
-            my ($start_position, $end_position) = ($-[0] / 3, ($+[0] - 1) / 3);
-            push @words,  @$content_array[$start_position .. $end_position];
-            push @words, {name => 'NL', content=>"\n"};
-        }
-        return \@words;
+    my %slc = ('...' => '...');
+    my $entity = 'AAA';
+    my $result = '';
+    for (map { $_->{name} } (@$content_array))
+    {
+        $slc{$_}//= $entity++;;
+        $result.=$slc{$_};
     }
-    $text =~s/<([^>]+)>\s*([^<]+)<[^>]+>\s*/_extract_entities($1, $2, $out, $pk)/gsei;
-    my $extraction = _capture_entities('LOC*? TIATTR*? CERTAINTY*? ADJ*? DIAG|ANATOM ANATOM{0,1} LOC*? ADJ*', $out);
-    warn join '', map {"<$_->{name}>$_->{content}</$_->{name}>"} @$extraction;
-    warn "***";
-    return $out;
+    $query = join '', map {
+            my ($pre, $mid, $post) = $_ =~/^([^A-Z]*)([A-Z\|]+)([^A-Z]*)/o;
+            $mid = join '|', map {$slc{$_} || 'ZZZ'} split /\|/o, $mid;
+            "$pre($mid)$post"
+    } split / /,$query;
+
+    while($result=~/$query/gs)  # let perl do the heavy lifting to make this grammar work
+    {
+        my ($start_position, $end_position) = ($-[0] / 3, ($+[0] - 1) / 3);
+        my $content = join '', map {"<$_->{name}>$_->{content}</$_->{name}>"} @$content_array[$start_position .. $end_position];
+        push @$res, {name => $name, content => $content};
+
+    }
 };
 
 ###########################################
@@ -148,7 +142,7 @@ helper fetchFromTable => sub { my ($self, $table, $sessionid, $where)=@_;
 		my($stmt, @bind) = $sql->select( -columns  => [-distinct => @cols], -from => $table, -where=> $where, -order_by=> $order_by);
 		my $sth = $self->db->prepare($stmt);
 		$sth->execute(@bind);
-		if($table eq 'document')
+		if($table eq 'documents')
         {
             my @res;
             while(my $c=$sth->fetchrow_hashref())
@@ -164,12 +158,18 @@ helper fetchFromTable => sub { my ($self, $table, $sessionid, $where)=@_;
 	return [];
 };
 
-get '/DBB/extracted_diagnoses/idletter/:pk' => [pk=>qr/[0-9]+/] => sub
+get '/DBB/extracted_entities/idletter/:pk' => [pk=>qr/[0-9]+/] => sub
 {	my $self = shift;
     my $pk  = $self->param('pk');
-    my $c = $self->fetchFromTable('document', undef, {id=> $pk})->[0];
+    my $c = $self->fetchFromTable('documents', undef, {id=> $pk})->[0];
+    my $extractors = $self->fetchFromTable('extractors', undef, {idproject=> $c->{idproject}});
     my $text = $self->preprocess_text($c->{content});
-    my $res = $self->extract_entities($pk, $text);
+    my $res = [];
+    foreach my $ex (@$extractors)
+    {
+        $self->extract_entities($pk, $text, $ex->{extractor}, $ex->{name}, $pk, $res);
+    }
+
     $self-> render(json => $res);
 };
 
@@ -203,7 +203,7 @@ put '/DBB/:table/:pk/:key'=> [key=>qr/\d+/] => sub
 
     my $ret;
     app->log->debug();
-    if(0&& $self->req->body) {
+    if($table ne 'documents' && $self->req->body) {
         my $jsonR   = decode_json( $self->req->body || '{}');
         my($stmt, @bind) = $sql->update($table, $jsonR, {$pk=>$key});
         my $sth = $self->db->prepare($stmt);

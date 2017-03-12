@@ -6,8 +6,26 @@
 
 <window bridge="YES" id="mainwindow" delegate="#CPOwner">
      <hbox>
+         <vbox>
+             <scrollView hasHorizontalScroller="NO" width="250" halign="min">
+                 <tableView zebra="yes" valueBinding="#CPOwner.projectsController" allowsMultipleSelection="NO">
+                     <tableColumn identifier="name" title="name"  width="150"  editable="NO"/>
+                 </tableView>
+             </scrollView>
+             <scrollView hasHorizontalScroller="NO" width="250" halign="min">
+                 <tableView zebra="yes" valueBinding="#CPOwner.extractorsController" allowsMultipleSelection="NO">
+                     <tableColumn identifier="name" title="name" editable="YES"/>
+                     <tableColumn identifier="extractor" title="extractor" editable="YES"/>
+                 </tableView>
+             </scrollView>
+             <ButtonBar width="250" halign="min" target="#CPOwner.extractorsController" actionsButton="NO" minusButtonAction="remove:" plusButtonAction="insert:"/>
+             <scrollView hasHorizontalScroller="NO" width="250" halign="min">
+                 <textView editable="YES" backgroundColor="white" valueBinding="#CPOwner.extractorsController.selection.extractor"/>
+             </scrollView>
+
+        </vbox>
         <scrollView hasHorizontalScroller="NO" width="250" halign="min">
-            <tableView zebra="yes" id="sendings_tv" valueBinding="#CPOwner.documentsController" allowsMultipleSelection="NO">
+            <tableView zebra="yes" valueBinding="#CPOwner.documentsController" allowsMultipleSelection="NO">
                <tableColumn identifier="name" title="name"  width="150"  editable="NO"/>
             </tableView>
         </scrollView>
@@ -18,7 +36,7 @@
                 <colorizingTextView editable="YES" id="textview" delegate="#CPOwner" backgroundColor="white" valueBinding="#CPOwner.documentsController.selection.content"/>
             </scrollView>
             <scrollView hasHorizontalScroller="NO">
-                <tableView valueBinding="#CPOwner.diagnosesController" allowsMultipleSelection="NO">
+                <tableView valueBinding="#CPOwner.entitiesController" allowsMultipleSelection="NO">
                     <tableColumn identifier="name" title="name" width="60" editable="NO"/>
                     <tableColumn identifier="content" title="content" editable="NO"/>
                 </tableView>

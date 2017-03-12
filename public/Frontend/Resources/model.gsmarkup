@@ -6,18 +6,33 @@
   <sortDescriptor id="by_name" key="name"/>
   <sortDescriptor id="by_id" key="id" numeric="YES"/>
 
-    <arrayController id="documents_controller" entity="document" autoFetch="YES" sortDescriptor="by_name"/>
-    <arrayController id="diagnoses_controller" entity="extracted_diagnoses" valueBinding="documents_controller.selection.diagnoses"/>
+    <arrayController id="projects_controller" entity="projects" autoFetch="YES" sortDescriptor="by_name"/>
+    <arrayController id="extractors_controller" entity="extractors" valueBinding="projects_controller.selection.extractors" sortDescriptor="by_name"/>
+    <arrayController id="documents_controller" entity="documents" valueBinding="projects_controller.selection.documents" sortDescriptor="by_name"/>
+    <arrayController id="entities_controller" entity="extracted_entities" valueBinding="documents_controller.selection.entities"/>
 </objects>
 
 <entities>
-    <entity id="document" store="#CPOwner.store">
+    <entity id="projects" store="#CPOwner.store">
         <column name="id" primaryKey="YES"/>
         <column name="name"/>
-        <column name="content"/>
-        <relationship type="toMany" name="diagnoses" bindingColumn="id"  targetColumn="idletter" target="extracted_diagnoses"/>
+        <relationship type="toMany" name="documents" bindingColumn="id" targetColumn="idproject" target="documents"/>
+        <relationship type="toMany" name="extractors" bindingColumn="id" targetColumn="idproject" target="extractors"/>
     </entity>
-    <entity id="extracted_diagnoses" store="#CPOwner.store">
+    <entity id="documents" store="#CPOwner.store">
+        <column name="id" primaryKey="YES"/>
+        <column name="idproject"/>
+        <column name="name"/>
+        <column name="content"/>
+        <relationship type="toMany" name="entities" bindingColumn="id"  targetColumn="idletter" target="extracted_entities"/>
+    </entity>
+    <entity id="extractors" store="#CPOwner.store">
+        <column name="id" primaryKey="YES"/>
+        <column name="idproject"/>
+        <column name="name"/>
+        <column name="extractor"/>
+    </entity>
+    <entity id="extracted_entities" store="#CPOwner.store">
         <column name="id" primaryKey="YES"/>
         <column name="idletter"/>
         <column name="name"/>
@@ -26,8 +41,10 @@
 </entities>
 
 <connectors>
+    <outlet source="#CPOwner" target="projects_controller" label="projectsController"/>
+    <outlet source="#CPOwner" target="extractors_controller" label="extractorsController"/>
     <outlet source="#CPOwner" target="documents_controller" label="documentsController"/>
-    <outlet source="#CPOwner" target="diagnoses_controller" label="diagnosesController"/>
+    <outlet source="#CPOwner" target="entities_controller" label="entitiesController"/>
 </connectors>
 
 

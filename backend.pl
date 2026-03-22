@@ -1,12 +1,10 @@
 #!/usr/local/ActivePerl-5.14/site/bin/morbo
 
-# NLP Backend 08.03.2017 by Daniel Boehringer
-
-# todos:
-#       support bcc mode
+# HPO Backend 08.03.2017 by Daniel Boehringer
 
 use Mojolicious::Lite;
 use Mojolicious::Plugin::Database;
+use SQL::Abstract;
 use SQL::Abstract::More;
 use Data::Dumper;
 use Mojo::UserAgent;
@@ -14,192 +12,191 @@ use Apache::Session::File;
 use Mojolicious::Plugin::RenderFile;
 use Encode;
 use Mojo::JSON qw(decode_json encode_json);
+use DBIx::Connector;
 
 no warnings 'uninitialized';
 
-plugin 'database', {
-        databases => {
-            db=>{
-                dsn	  => 'dbi:Pg:dbname=nlp;host=localhost',
-                username => 'postgres',
-                password => 'postgres',
-                options  => { 'pg_enable_utf8' => 1, AutoCommit => 1 },
-                helper   => 'db'
-            }
-        }
+
+helper connector_db => sub {
+    state $db = DBIx::Connector->new('dbi:Pg:dbname=hpo;host=localhost', 'postgres','postgres',  { pg_enable_utf8 => 1, AutoCommit => 1 });
 };
-plugin 'RenderFile'; 
+helper db => sub { shift->connector_db->dbh };
 
 
-helper preprocess_text => sub { my ($self, $text)=@_;
-    $text =~s/<c3><84>/Ä/ogsi;
-    $text =~s/<c3><bc>/ü/ogsi;
-    $text =~s/<c3><a4>/ä/ogsi;
-    $text =~s/<c3><b6>/ö/ogsi;
-    $text =~s/<c3><9f>/ß/ogsi;
-    $text =~s/<c3><a8>/è/ogsi;
-    $text =~s/<c3><96>/Ö/ogsi;
+plugin 'RenderFile';
 
-    $text =~s/<..>(.)<...>/$1/ogsi;
-    $text =~s/<[^>]+>Z\.n<[^>]+>\s+\.\s+/<TIATTR> Zustand nach <\/TIATTR>/ogsi;
-    $text =~s/<[^>]+>Z\.<[^>]+>\s+<[^>]+>n<[^>]+>\s+\./<TIATTR> Zustand nach <\/TIATTR>/ogsi;
-    $text =~s/<[^>]+>Aktuell<[^>]*>[\s:]+/<TIATTR> Aktuell <\/TIATTR>/ogsi;
-    $text =~s/<[^>]+>V\.a<[^>]+>\s+\.\s+/<CERTAINTY> Verdacht auf <\/CERTAINTY>/ogsi;
-    $text =~s/<[^>]+>V\.<[^>]+>\s+a\s+\.s+/<CERTAINTY> Verdacht auf <\/CERTAINTY>/ogsi;
-    $text =~s/<[^>]+>a\.e<[^>]+>\s+\.\s+/<CERTAINTY> Am ehesten <\/CERTAINTY>/ogsi;
-
-    $text =~s/<CARD>[0-9]{5}<\/CARD>\s+<N.>([^>]+)<\/N.>/<ORT>$1<\/ORT>/ogsi;
-    $text =~s/<[^>]+>([^>]+?(str|strasse|straße|platz|weg))<\/[^>]+>[\s\.]*<CARD>([^>]+?)<\/CARD>/<STR>$1 $3<\/STR>/ogsi;
-    $text =~s/<CARD>(0761[^>]+?)<\/CARD>/<TEL>$1 $2<\/TEL>/ogsi;
-    $text =~s/<[^>]+>(kolleg[^>]+|FRAU|HERR[N]?)<[^>]+>/<ANREDE>$1<\/ANREDE>/ogsi;
-    $text =~s/<[^>]+>((Prof[\.]?|Dr[\.]?|med[\.]?))<[^>]+>[\s\.]*/<PTITLE>$1<\/PTITLE>/ogsi;
-
-    $text =~s/<N.>([BRL]A)<\/N.>/<LOC>$1<\/LOC>/ogsi;
-    $text =~s/<[^>]+>rechte[snm]<[^>]+>\s+<[^>]+>Aug[esn]+<[^>]+>/<LOC>RA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>linke[snm]<[^>]+>\s+<[^>]+>Aug[esn]+<[^>]+>/<LOC>LA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>beide[n]?<[^>]+>\s+<[^>]+>Augen<[^>]+>/<LOC>BA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>(beidseits|beids\.?|bds\.?)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>(r(.)l)<[^>]+>/<LOC>BA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>(rechts)<[^>]+>/<LOC>RA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>(links)<[^>]+>/<LOC>LA<\/LOC>/ogsi;
-    $text =~s/<[^>]+>([kk]ornea|hh|fd|wirts[^>]+|^ora|hornhaut|linke|iris|pupille|vorderkammer|vk|papille|sehner[^>]+|ma[ck]ula|fovea|netzhaut|kammerwinkel|kw|zonula|arkade|limbus|epithel|stroma|endothel|pigmentepithel|bündel|senke|peripherie|[^>]+rand|[^>]+zentrum|[^>]+randraum|iol|intraokularl[^>]|nervenfaser[^>]+|bindehaut|transplantat|Fundus|tp[l\.]*|[ck]onjun[ck]t[^>]+|areal[e]?|medien|bereich|oberfläche|ekn|f[aä]den|filterkissen|bleb|iridektomie|PI)<[^>]+>/<ANATOM>$1<\/ANATOM>/ogsi;
-    $text =~s/<[^>]+>([^>]+(aris|ilis|atus|ilata|amatus|ectus|ecta|piens|führend[ersmn]+|liche[ersmn]+|kannt[ersmn]+|minent[ersmn]+))<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[^>]+>(o[ck]+ult[ernm]+|multipl[ernms]+|schräg[ernms]+|vital[ersmn]*|stumpf[ersmn]+|randscharf[ersmn]*|erbreit[ersmn]+|mild[ersmn]+|reizfrei[ersmn]*|reizarm[ersmn]*|leer[ersmn]*|feucht[ersmn]*|trock[ersmn]+|[^>]+ient|nasal|temporal|viel[ersmn]+|wenig[ersmn]+|anliegend[ersmn]*|gestaucht[ersmn]+|gestippt[ersmn]+|schlecht[ersmn]+|bess[ersmn]+|sicca|atö[ersmn]+|[^>]+bessert[ersmn]+|[^>]+eschloss[ersmn]+|peripher[ersmn]+|[^>]*tief[ersmn]*|fest[ersmn]+|[^>]*lock[ersmn]+|adaptiert[ersmn]*|aufgelock[ertsmn]*)<[^>]+>/<ADJA>$1<\/ADJA>/ogsi;
-    $text =~s/<[NF].>([^>]+verschluss|[ck]atara[^>]+|[^>]*amotio[^>]*|[^>]*ablösun[gen]+|[^>]*itis|[^>]*ose|[^>]*generation|amd|cmv|CCS|smd[^>]*vaskularisation|morbus[^>]|[^>]*ödem|[^>]*dekompensation|[^>]+befund|[^>]*un[gen]+|[^>]*erkrankun[gen]+|[^>]*störun[gen]+|[^>]*ul[kcusera]+|[^>]*zündun[gen]+|[^>]*schielen|[^>]*opie|[^>]*mus|[^>]*star|[^>]*opie|[^>]*narbe|[^>]*iom|[^>]*gium|[^>]*cula|[^>]*phakie|[^>]*tion|[^>]*tio[en]+|[^>]*ophie|[^>]*tonie|[^>]*athie|[^>]*kom|[^>]*ämie|[^>]*ression|[^>]*nom|[^>]*giom|[^>]+foram[ensia]+|[^>]*osis|[^>]*osie|[^>]*nävus|[^>]*-riss|POWG|PCOWG|[^>]*illom|[^>]*iasie[n]?|[^>]*konus|[^>]*globus|[^>]*pathi[ea]|[^>]*syndrom|[^>]*response|[^>]-schub|[^>]chie[n]?|[^>]*skotom[e]?|VAV|CNV|[^>]*reaktio[en]+|[^>]*lys[en]+|[^>]*sis|[^>]*omie|[^>]*keit|[^>]*kung|[^>]+-Ca|[^>]+phom|[^>]+olie[^>]+vus|[^>]+nävi|[^>]+igung|[^>]+sfall|[^>]+plex|MS|[^>]sion|[^>]malie|[^>]malazie|[^>]osi[ones]+|[^>]plasie|pex|[^>]*zion|[^>]*olum|[^>]*chstand|[^>]*iefstand|rop|[^>]*stom|adhs|[^>]*loch|[^>]*infarkt|[^>]*penie|[^>]*zytose[^>]*areale|Telangiektasien|[^>]+pathie|[^>]ckage|[^>]+membran|[^>]*angst)<\/[NF].>/<DIAG>$1<\/DIAG>/ogsi;
-    $text =~s/<[^>]+>cornea<[^>]+>\s+<[^>]+>guttata<[^>]+>/<DIAG>Cornea guttata<\/DIAG>/ogsi;
-    $text =~s/<[^>]+>diabetes<[^>]+>\s+<[^>]+>mellitus<[^>]+>/<DIAG>Diabetes mellitus<\/DIAG>/ogsi;
-    $text =~s/<[^>]+>multiple<[^>]+>\s+<[^>]+>sklerose<[^>]+>/<DIAG>Multiple sklerose<\/DIAG>/ogsi;
-    $text =~s/<[^>]+>morbus<[^>]+>\s+<[^>]+>(<[^>]+)>/<DIAG>$1<\/DIAG>/ogsi;
-    $text =~s/<[^>]+>(art|arterielle|a)<[^>]+>\s+\.?\s*<[^>]+>hypertonie<[^>]+>/<DIAG>Bluthochdruck<\/DIAG>/ogsi;
-
-    $text =~s/<[^>]+>(vorgeschichte|beurteilung|epikrise|kontrolluntersuchung|befund[e]?|operation|allgemein)<[^>]+>\s+:/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
-    $text =~s/<[^>]+>(allgemein|befund[e]?|diagnose[n]?|beurteilung|VAA|vorderabschnitt[e]?|fachbereich|vorgeschichte)<[^>]+>[\s:]+/\n\n<STRUCTURE>$1<\/STRUCTURE>\n/ogsi;
-    $text =~s/<[^>]+>(EYLEA[^>]*|fotil|dotrav|[^>]+sopt|clonid|mitomycin|azopt|avastin|lucentis|[^>]+olol|Timophtal|valtrex|aciclovir|floxal|vori[ck]onazol|vexol|inflanefran[^>]*|dexa[^>]*|xalatan|travatan|Mar[ck]umar|plavix|xarelto|metformin|ciclosporin|decortin|predni[^>]*|amiodaron|Tamsulosin|Penicillin|Cefuroxim|ganfort|Triamcinolon|lumigan|Metothrexat|[^>]+azol[^>]+|ozurdex[^>]+|alphagan[^>]+|combigan[^>]+|cornerege[^>]+|ASS[^>]*|clopid[^>]*|glaupax|godamed|acemit|diamox|sandimmun|myfortic)<[^>]+>/<MED>$1<\/MED>/ogsi;
-    $text =~s/<[^>]+>([^>]+)<[^>]+>\s*<[^>]+>AT<[^>]+>/<MED>$1<\/MED>/ogsi;
-    $text =~s/<[^>]+>(visus|tensio|augendruck|OCT|spectralis|pentacam|orbscan|amsler|augenstellung|doppelbildschema|Pupillomotorik|Abdecktest|Stereosehen|Motilität|Vorderabschnitte)<[^>]+>/\n<MEASURE>$1<\/MEASURE>/ogsi;
-
-    $text =~s/<[^>]+>([^>]*infiltra[ten]+|pitat[en]+|[^>]*beschläge[en]+|narb[en]+|enz[en]+|[^>]*zellen|ma[CK]rophagen|lichtweg|[^>]*atrophie|reflexe|doppelbilder|[^>]+herde[n]?|exsudat[ens]*|[^>]+areal[ens]*|[^>]+[k]ung[en]*|prominenz[en]*|pigment[ens]*|[^>]*koagel[ns]*|[^>]+defekte[ns]*|fibrin[ens]*|injiziert[ens]*|druse[n]?|shuntgefäß[en]*|Ex[ck]av[^>]+|foram[ensia]+|glitzern|flüssigkeit|staphylom|[^>]*verschiebung[en]*)<[^>]+>/<BEFUND>$1<\/BEFUND>/ogsi;
-
-    $text =~s/\s+\.\s+/.<BREAK>\n<\/BREAK>/ogsi;
-    # $text =~s/\s+([,])\s+/$1<BREAK> /ogsi;
-    $text =~s/\s+([:,])\s+/$1 /ogsi;
-    $text =~s/\n\s+/\n/ogsi;
-    $text =~s/<(.?)ADJ.>/<$1ADJ>/ogsi;  # treat all adjectives the same
-    return $text;
+# turn browser cache off
+hook after_dispatch => sub {
+    my $tx = shift;
+    my $e  = Mojo::Date->new(time - 100);
+    $tx->res->headers->header(Expires => $e);
+    $tx->res->headers->header('X-ARGOS-Routing' => '3026');
 };
 
-helper extract_entities => sub { my ($self, $pk, $text, $query, $name, $idletter, $res)=@_;
-    my $content_array = [];
-    sub _extract_entities{
-        my $key = shift;
-        my $value = shift;
-        my $out = shift;
-        my $pk = shift;
-        state $i = 0;
-        push @$out, {id=>$i, idletter => $pk, name => $key, content => $value} if $key!~/ART|KON|APPR|PPER/ && $value!~/^.?\s*$|^untersuchung|^Durchführung|Vorstellung|^Operation|^XX+|^\/.+/ios;
-        $i++;
-        return '';
-    }
-    $text =~s/<([^>]+)>\s*([^<]+)<[^>]+>\s*/_extract_entities($1, $2, $content_array, $pk)/gsei;
-    # this is a mini-grammar on the entity-names that supports full regex-syntax (e.g. 'LOC* TIATTR* CERTAINTY* ADJA* ADJD* DIAG|ANATOM ADJA* ADJD* (?<!BREAK)')
-    my %slc = ('...' => '...');
-    my $entity = 'AAA';
-    my $result = '';
-    for (map { $_->{name} } (@$content_array))
-    {
-        $slc{$_}//= $entity++;;
-        $result.=$slc{$_};
-    }
-    $query = join '', map {
-            my ($pre, $mid, $post) = $_ =~/^([^A-Z]*)([A-Z\|]+)([^A-Z]*)/o;
-            $mid = join '|', map {$slc{$_} || 'ZZZ'} split /\|/o, $mid;
-            "$pre($mid)$post"
-    } split / /,$query;
+any '/DBB/submit_to_vectorstore' => sub
+{
+    my $self = shift;
 
-    while($result=~/$query/gs)  # let perl do the heavy lifting to make this grammar work
-    {
-        my ($start_position, $end_position) = ($-[0] / 3, ($+[0] - 1) / 3);
-        my $content = join '', map {"<$_->{name}>$_->{content}</$_->{name}>"} @$content_array[$start_position .. $end_position];
-        push @$res, {name => $name, content => $content};
+    my $sth  = $self->db->prepare( q{
+        SELECT id, coalesce(corrected_hpo, hpo) as hpo, term_english, case when idblock in (16, 47) then 'hpo_vaa_e5' else 'hpo_fd_e5' end as source FROM public.thai_project where resolved_date is not null and date_submitted is  null
+            });
 
+
+    $sth->execute();
+
+    my $outR   = $sth->fetchall_arrayref({});
+
+    my $header = "label;payload\x0d\x0a";
+
+    my $result = {hpo_vaa_e5 => $header, hpo_fd_e5 => $header};
+
+    foreach my $row (@{$outR})
+    {
+        my $hpo = $row->{hpo} + 0;
+        my $term_english = $row->{term_english};
+        $term_english =~s/\s+/ /ogsi;
+        $result->{$row->{source}} .= "$hpo;$term_english\x0d\x0a";
+
+        $self->db->prepare(q/update thai_project set date_submitted = now() where id = ?/)->execute($row->{id});
     }
+
+    my $ua = Mojo::UserAgent->new;
+    $ua->inactivity_timeout(0);
+    $ua->request_timeout(0);
+
+    #warn $result->{$_} for qw /hpo_vaa_e5 hpo_fd_e5/;
+
+    $ua->post("http://aug-info:3036/LLM/import_embedding_dataset/29?preserve=1" => {Accept => '*/*'} => $result->{hpo_vaa_e5});
+    warn "did vaa: $result->{hpo_vaa_e5}";
+    $ua->post("http://aug-info:3036/LLM/import_embedding_dataset/25?preserve=1" => {Accept => '*/*'} => $result->{hpo_fd_e5});
+    warn "did fd: $result->{hpo_fd_e5}";
+
+    $self->render(text => 'OK');
 };
 
 ###########################################
 # generic dbi part
 
 helper fetchFromTable => sub { my ($self, $table, $sessionid, $where)=@_;
-	my $sql = SQL::Abstract::More->new;
-	my $order_by=[];
+    my $sql = SQL::Abstract::More->new;
+    my $order_by=[];
 
+    my @a;
 
-	my @a;
-	if(1|| $sessionid)		# implement session-bound serverside security
-	{	my %session;
-        #	tie %session, 'Apache::Session::File', $sessionid , {Transaction => 0};
-        # $table='persons_fulltext' if $table eq 'persons';
-		my @cols=qw/*/;
-		my($stmt, @bind) = $sql->select( -columns  => [-distinct => @cols], -from => $table, -where=> $where, -order_by=> $order_by);
-		my $sth = $self->db->prepare($stmt);
-		$sth->execute(@bind);
-		if($table eq 'documents')
-        {
-            my @res;
-            while(my $c=$sth->fetchrow_hashref())
-            {   $c->{content} = $self->preprocess_text($c->{content});
-                push @res, $c;
-            }
-            return \@res;
-        } else
-        {
-            return $sth->fetchall_arrayref({});
-        }
-	}
-	return [];
-};
-
-get '/DBB/extracted_entities/idletter/:pk' => [pk=>qr/[0-9]+/] => sub
-{	my $self = shift;
-    my $pk  = $self->param('pk');
-    my $c = $self->fetchFromTable('documents', undef, {id=> $pk})->[0];
-    my $extractors = $self->fetchFromTable('extractors', undef, {idproject=> $c->{idproject}});
-    my $text = $self->preprocess_text($c->{content});
-    my $res = [];
-    foreach my $ex (@$extractors)
+    if (1|| $sessionid)        # implement session-bound serverside security
     {
-        $self->extract_entities($pk, $text, $ex->{extractor}, $ex->{name}, $pk, $res);
+        $table = 'thai_filtered' if $table eq 'thai_project';
+        my @cols=qw/*/;
+        my($stmt, @bind) = $sql->select( -columns  => [-distinct => @cols], -from => $table, -where=> $where, -order_by=> $order_by);
+        my $sth = $self->db->prepare($stmt);
+        $sth->execute(@bind);
+
+        return $sth->fetchall_arrayref({});
     }
 
-    $self-> render(json => $res);
+    return [];
+};
+
+# Fetch root nodes (nodes with no parents)
+get '/DBB/hpo/roots' => sub {
+    my $self = shift;
+    my $sql = q{
+                    SELECT t.id, t.label,
+                    (CASE WHEN EXISTS (SELECT 1 FROM public.isas WHERE idparent = t.id) THEN 0 ELSE 1 END) as is_leaf
+                    FROM public.terms t
+                    WHERE t.id in (SELECT idparent FROM public.isas )
+                    order by 2
+                };
+    my $sth = $self->db->prepare($sql);
+    $sth->execute();
+    
+    $self->render(json => $sth->fetchall_arrayref({}));
+};
+
+# Fetch children of a specific node
+get '/DBB/hpo/children/:id' => [id => qr/.+/] => sub {
+    my $self = shift;
+    my $id = $self->param('id');
+    my $sql = q{
+                    SELECT t.id, t.label,
+                           (CASE WHEN EXISTS (SELECT 1 FROM public.isas WHERE idparent = t.id) THEN 0 ELSE 1 END) as is_leaf
+                    FROM public.terms t
+                    JOIN public.isas i ON t.id = i.idchild
+                    WHERE i.idparent = ?
+                    ORDER BY t.label
+                };
+    my $sth = $self->db->prepare($sql);
+    $sth->execute($id);
+    
+    $self->render(json => $sth->fetchall_arrayref({}));
+};
+
+get '/DBB/children/idparent/:pk' => [pk=>qr/[0-9]+/] => sub
+{    my $self = shift;
+    my $pk  = $self->param('pk');
+
+    my $sql=qq{ select distinct terms.id, terms.label from all_childen_of(?) a join terms on terms.id = a.identity };
+    my $sth = $self->db->prepare( $sql );
+    $sth->execute(($pk));
+
+    $self-> render(json => $sth->fetchall_arrayref({}));
+};
+
+get '/DBB/hpo_cleaned_vaa' => sub
+{
+    my $self = shift;
+
+    my $sql = q{ select * from hpo_cleaned where code_system = 'vaa' order by 1 };
+    my $sth = $self->db->prepare( $sql );
+    $sth->execute();
+
+    $self->render(json => $sth->fetchall_arrayref({}));
+};
+
+get '/DBB/hpo_cleaned_fd' => sub
+{
+    my $self = shift;
+
+    my $sql = q{ select * from hpo_cleaned where code_system = 'fd' order by 1 };
+    my $sth = $self->db->prepare( $sql );
+    $sth->execute();
+
+    $self->render(json => $sth->fetchall_arrayref({}));
 };
 
 # fetch all entities
 get '/DBB/:table'=> sub
-{	my $self = shift;
-	my $table  = $self->param('table');
-	my $sessionid  = $self->param('session');
-	my $res=$self->fetchFromTable($table, $sessionid, {});
-	$self-> render( json => $res);
+{
+    my $self = shift;
+    my $table  = $self->param('table');
+    my $sessionid  = $self->param('session');
+
+    my $res = $self->fetchFromTable($table, $sessionid, {});
+
+    $self-> render( json => $res);
 };
 
 # fetch entities by (foreign) key
 get '/DBB/:table/:col/:pk' => [col=>qr/[a-z_0-9\s]+/, pk=>qr/[a-z0-9\s\-_\.]+/i] => sub
-{	my $self = shift;
-	my $table  = $self->param('table');
-	my $pk  = $self->param('pk');
-	my $col  = $self->param('col');
-	my $sessionid  = $self->param('session');
-	my $res=$self->fetchFromTable($table, $sessionid, {$col=> $pk});
-	$self-> render( json => $res);
+{
+    my $self = shift;
+    my $table  = $self->param('table');
+    my $pk  = $self->param('pk');
+    my $col  = $self->param('col');
+    my $sessionid  = $self->param('session');
+    my $res=$self->fetchFromTable($table, $sessionid, {$col=> $pk});
+
+    $self->render( json => $res);
 };
 
 # update
 put '/DBB/:table/:pk/:key'=> [key=>qr/\d+/] => sub
-{	my $self	= shift;
-	my $table	= $self->param('table');
-	my $pk		= $self->param('pk');
-	my $key		= $self->param('key');
-	my $sql		= SQL::Abstract->new;
+{
+    my $self    = shift;
+    my $table    = $self->param('table');
+    my $pk        = $self->param('pk');
+    my $key        = $self->param('key');
+    my $sql        = SQL::Abstract->new;
 
     my $ret;
     app->log->debug();
@@ -211,74 +208,47 @@ put '/DBB/:table/:pk/:key'=> [key=>qr/\d+/] => sub
         app->log->debug("err: ".$DBI::errstr ) if $DBI::errstr;
         $ret={err=> $DBI::errstr};
     }
-	$self->render( json=> $ret);
+    $self->render( json=> $ret);
 };
 
 # insert
 post '/DBB/:table/:pk'=> sub
-{	my $self	= shift;
-	my $table	= $self->param('table');
-	my $pk		= $self->param('pk');
-	my $sql = SQL::Abstract->new;
-	my $jsonR   = decode_json( $self->req->body  || '{"name":"New"}' );
+{
+    my $self    = shift;
+    my $table    = $self->param('table');
+    my $pk        = $self->param('pk');
+    my $sql = SQL::Abstract->new;
+    my $jsonR   = decode_json( $self->req->body  || '{"name":"New"}' );
 
-	my($stmt, @bind) = $sql->insert( $table, $jsonR);
-	my $sth = $self->db->prepare($stmt);
-	$sth->execute(@bind);
-	app->log->debug("err: ".$DBI::errstr ) if $DBI::errstr;
-	my $valpk= $self->db->last_insert_id(undef, undef, $table, $pk);
-	$self->render( json=>{err=> $DBI::errstr, pk => $valpk} );
+    my($stmt, @bind) = $sql->insert( $table, $jsonR);
+    my $sth = $self->db->prepare($stmt);
+    $sth->execute(@bind);
+    app->log->debug("err: ".$DBI::errstr ) if $DBI::errstr;
+    my $valpk= $self->db->last_insert_id(undef, undef, $table, $pk);
+
+    $self->render( json=>{err=> $DBI::errstr, pk => $valpk} );
 };
 
 # delete
 del '/DBB/:table/:pk/:key'=> [key=>qr/\d+/] => sub
-{	my $self	= shift;
-	my $table	= $self->param('table');
-	my $pk		= $self->param('pk');
-	my $key		= $self->param('key');
-	my $sql = SQL::Abstract->new;
+{
+    my $self    = shift;
+    my $table    = $self->param('table');
+    my $pk        = $self->param('pk');
+    my $key        = $self->param('key');
+    my $sql = SQL::Abstract->new;
 
-	my($stmt, @bind) = $sql->delete($table, {$pk=>$key});
-	my $sth = $self->db->prepare($stmt);
-	$sth->execute(@bind);
-	app->log->debug("err: ".$DBI::errstr ) if $DBI::errstr;
-	$self->render( json=>{err=> $DBI::errstr} );
-};		
-
-
-helper LDAPChallenge => sub { my ($self, $name, $password)=@_;
-    return 1;
-    my $ldap = Net::LDAP->new( 'ldap://ldap.ukl.uni-freiburg.de' );
-	my $msg = $ldap->bind( 'uid='.$name.', ou=people, dc=ukl, dc=uni-freiburg, dc=de', password => $password);
-	return $msg->code==0;
-};
-
-post '/AUTH' => sub {
-	my $self=shift;
-	my $user= $self->param('u');
-	my $pass= $self->param('p');
-	my $sessionid='';
-	if($user)
-	{	if($self->LDAPChallenge($user,$pass))
-		{	my  %session;
-			tie %session, 'Apache::Session::File', undef , {Transaction => 0};
-			$sessionid = $session{_session_id};
-			$session{username}=$user;
-		}
-	} $self->render(text => $sessionid );
-};
-
-helper getObjectFromTable => sub { my ($self, $table, $id, $dbh_dc)=@_;
-	my $dbh  = $dbh_dc? $dbh_dc: $self->db;
-	return undef if $id eq 'null' ||  $id eq 'NULL' ||  $id eq '';
-	my $sth = $dbh->prepare( qq/select * from "/.$table.qq/" where id=?/);
-	$sth->execute(($id));
-	return $sth->fetchrow_hashref();
+    my($stmt, @bind) = $sql->delete($table, {$pk=>$key});
+    my $sth = $self->db->prepare($stmt);
+    $sth->execute(@bind);
+    app->log->debug("err: ".$DBI::errstr ) if $DBI::errstr;
+    
+    $self->render( json=>{err=> $DBI::errstr} );
 };
 
 
 ###################################################################
 # main()
 
-app->config(hypnotoad => {listen => ['http://*:3000'], workers => 5, heartbeat_timeout=>1200, inactivity_timeout=> 1200});
+app->config(hypnotoad => {listen => ['http://*:3026'], workers => 3, heartbeat_timeout=>120, inactivity_timeout=> 120});
 app->start;

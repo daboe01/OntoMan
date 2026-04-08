@@ -74,6 +74,50 @@ any '/DBB/submit_to_vectorstore' => sub
     $self->render(text => 'OK');
 };
 
+get '/DBB/hpo/search/:query' => sub {
+    my $self = shift;
+    my $query = $self->param('query');
+    my $search_term = "%$query%";
+
+    # HPO ist ein DAG. Wir bauen das Array Schritt für Schritt auf
+    # und nehmen am Ende nur EINEN validen Pfad pro Treffer.
+    my $sql = q{
+        WITH RECURSIVE search_tree AS (
+        -- Basis: Finde die passenden HPO Terms. Wir starten das Array mit dem Treffer.
+        SELECT t.id as match_id, t.id as current_id, ARRAY[t.id] as path
+        FROM public.terms t
+        WHERE t.label ILIKE ?
+
+        UNION ALL
+
+        -- Rekursion: Finde die Eltern-Knoten und setze sie VOR den bisherigen Pfad (|| Operator)
+        SELECT st.match_id, i.idparent as current_id, i.idparent || st.path
+        FROM search_tree st
+        JOIN public.isas i ON st.current_id = i.idchild
+        -- Optionaler Zirkelbezug-Schutz: WHERE NOT i.idparent = ANY(st.path)
+        )
+        -- DISTINCT ON (match_id) wählt für jeden Treffer exakt EINEN Pfad aus.
+        -- ORDER BY array_length stellt sicher, dass wir den längsten Pfad nehmen (der bis ganz zur Wurzel reicht).
+        SELECT DISTINCT ON (match_id) match_id, path
+        FROM search_tree
+        ORDER BY match_id, array_length(path, 1) DESC
+    };
+
+    my $sth = $self->db->prepare($sql);
+    $sth->execute($search_term);
+
+    my $results = $sth->fetchall_arrayref({});
+
+    foreach my $row (@$results) {
+        if ($row->{path} =~ /^\{(.*)\}$/) {
+            my @path_array = split(',', $1);
+            $row->{path} = \@path_array;
+        }
+    }
+
+    $self->render(json => $results);
+};
+
 ###########################################
 # generic dbi part
 
@@ -245,7 +289,6 @@ del '/DBB/:table/:pk/:key'=> [key=>qr/\d+/] => sub
     
     $self->render( json=>{err=> $DBI::errstr} );
 };
-
 
 ###################################################################
 # main()

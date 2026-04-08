@@ -104,22 +104,166 @@
     }];
 }
 
-// --- Dynamic Search Filtering using CPPredicate ---
+// --- NEU: Suche ans Backend senden ---
 - (void)searchAction:(id)sender
 {
     var searchString = [sender stringValue];
     
     if (!searchString || [searchString length] === 0)
     {
-        // Reset to full list
-        [treeController setContent:_allRoots];
+        // Wenn das Suchfeld leer ist, leeren wir die Selektion
+        [treeController setSelectionIndexPaths:[]];
+        return;
     }
+    [textView setString:@"Suche läuft..."];
+
+    var urlString = "/DBB/hpo/search/" + encodeURIComponent(searchString);
+    var request = [CPURLRequest requestWithURL:urlString];
+
+    [CPURLConnection sendAsynchronousRequest:request
+                                       queue:[CPOperationQueue mainQueue]
+                           completionHandler:function(response, data, error) {
+                                if (!error && data) {
+                                    var json =[CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                                    [self expandAndSelectPaths:json];
+                                } else {
+                                    [textView setString:@"Fehler bei der Suche."];
+                                }
+                            }];
+}
+
+- (void)expandAndSelectPaths:(CPArray)searchResults
+{
+    // Sicherstellen, dass searchResults nicht null oder undefiniert ist
+    if (!searchResults || searchResults.length === 0)
+    {
+        [textView setString:@"Keine Treffer gefunden oder ungültige Server-Antwort."];
+        [treeController setSelectionIndexPaths:[]];
+
+        return;
+    }
+    if (searchResults.length === 0)
+    {
+        [textView setString:@"Keine Treffer gefunden."];
+        [treeController setSelectionIndexPaths:[]];
+        return;
+    }
+    [textView setString:searchResults.length + @" Treffer gefunden. Lade Baumstruktur..."];
+
+    var targetIndexPaths = [CPMutableArray array];
+    var pendingPaths = searchResults.length;
+
+    // Wir gehen jeden gefundenen Pfad einzeln durch
+    for (var i = 0; i < searchResults.length; i++)
+    {
+        var nodeIds = searchResults[i].path; // z.B. [RootID, ChildID, MatchID]
+
+        [self resolvePath:nodeIds
+             currentIndex:0
+            currentModels:_allRoots
+            baseIndexPath:nil
+               completion:function(finalIndexPath) {
+
+                        if (finalIndexPath) {
+                            [targetIndexPaths addObject:finalIndexPath];
+                        }
+
+            pendingPaths--;
+            
+            // Wenn alle Pfade fertig aufgelöst wurden, markieren wir sie im TreeController
+            if (pendingPaths === 0)
+            {
+                // 1. Selektion im Model setzen
+                [treeController setSelectionIndexPaths:targetIndexPaths];
+
+                // 2. Visuelles Aufklappen im CPOutlineView erzwingen
+                for (var idx = 0; idx < targetIndexPaths.length; idx++) {
+                    var currentPath = targetIndexPaths[idx];
+                    
+                    // Wir starten bei der Wurzel (Ebene 0)
+                    var partialPath = [CPIndexPath indexPathWithIndex:[currentPath indexAtPosition:0]];
+                    
+                    // Wir gehen den Pfad hinab und klappen jeden Knoten auf
+                    // (außer den letzten Knoten selbst, der ist ja der Treffer)
+                    for (var level = 1; level < [currentPath length]; level++)
+                    {
+                        var treeNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:partialPath];
+                        if (treeNode)
+                        {
+                            [outlineView expandItem:treeNode];
+                        }
+                        // Nächste Ebene anhängen
+                        partialPath = [partialPath indexPathByAddingIndex:[currentPath indexAtPosition:level]];
+                    }
+                }
+                
+                // 3. Zum ersten Treffer scrollen, damit der Nutzer ihn sofort sieht!
+                if (targetIndexPaths.length > 0) {
+                    var firstMatchNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:targetIndexPaths[0]];
+                    var rowIndex = [outlineView rowForItem:firstMatchNode];
+                    
+                    if (rowIndex >= 0) {
+                        [outlineView scrollRowToVisible:rowIndex];
+                    }
+                }
+
+                [textView setString:@"Alle Treffer markiert und aufgeklappt."];            }
+        }];
+    }
+}
+
+- (void)resolvePath:(CPArray)nodeIds currentIndex:(int)index currentModels:(CPArray)models baseIndexPath:(NSIndexPath)indexPath completion:(Function)callback
+{
+    if (index >= nodeIds.length)
+    {
+        callback(indexPath);
+        return;
+    }
+
+    var targetId = parseInt(nodeIds[index], 10);
+    var foundModelIndex = -1;
+    var foundModel = nil;
+
+    // Finde das Modell mit der aktuellen ID in der aktuellen Ebene
+    for (var i = 0; i < models.length; i++)
+    {
+        if ([models[i] termId] === targetId)
+        {
+            foundModelIndex = i;
+            foundModel = models[i];
+            break;
+        }
+    }
+
+    // Wenn der Knoten nicht gefunden wurde (Daten inkonsistent), brechen wir diesen Pfad ab
+    if (!foundModel)
+    {
+        callback(nil);
+        return;
+    }
+
+    // CPIndexPath erweitern
+    var nextIndexPath = indexPath ? [indexPath indexPathByAddingIndex:foundModelIndex] : [CPIndexPath indexPathWithIndex:foundModelIndex];
+
+    // Sind wir am Ende des Pfades angekommen? (Das ist unser Treffer)
+    if (index === nodeIds.length - 1)
+    {
+        callback(nextIndexPath);
+    } 
     else
     {
-        // Case insensitive [c] and diacritic insensitive [d] search on the 'name' property
-        var predicate = [CPPredicate predicateWithFormat:@"name CONTAINS[cd] %@", searchString];
-        var filteredRoots = [_allRoots filteredArrayUsingPredicate:predicate];
-        [treeController setContent:filteredRoots];
+        // Wir müssen tiefer in den Baum. Sind die Kinder schon geladen?
+        if ([foundModel hasLoadedChildren])
+        {
+            [self resolvePath:nodeIds currentIndex:(index + 1) currentModels:[foundModel children] baseIndexPath:nextIndexPath completion:callback];
+        }
+        else
+        {
+            // Kinder asynchron vom Server laden
+            [foundModel fetchChildrenWithCompletion:function(newChildren) {
+                            [self resolvePath:nodeIds currentIndex:(index + 1) currentModels:newChildren baseIndexPath:nextIndexPath completion:callback];
+                      }];
+        }
     }
 }
 

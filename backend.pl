@@ -33,47 +33,6 @@ hook after_dispatch => sub {
     $tx->res->headers->header('X-ARGOS-Routing' => '3026');
 };
 
-any '/DBB/submit_to_vectorstore' => sub
-{
-    my $self = shift;
-
-    my $sth  = $self->db->prepare( q{
-        SELECT id, coalesce(corrected_hpo, hpo) as hpo, term_english, case when idblock in (16, 47) then 'hpo_vaa_e5' else 'hpo_fd_e5' end as source FROM public.thai_project where resolved_date is not null and date_submitted is  null
-            });
-
-
-    $sth->execute();
-
-    my $outR   = $sth->fetchall_arrayref({});
-
-    my $header = "label;payload\x0d\x0a";
-
-    my $result = {hpo_vaa_e5 => $header, hpo_fd_e5 => $header};
-
-    foreach my $row (@{$outR})
-    {
-        my $hpo = $row->{hpo} + 0;
-        my $term_english = $row->{term_english};
-        $term_english =~s/\s+/ /ogsi;
-        $result->{$row->{source}} .= "$hpo;$term_english\x0d\x0a";
-
-        $self->db->prepare(q/update thai_project set date_submitted = now() where id = ?/)->execute($row->{id});
-    }
-
-    my $ua = Mojo::UserAgent->new;
-    $ua->inactivity_timeout(0);
-    $ua->request_timeout(0);
-
-    #warn $result->{$_} for qw /hpo_vaa_e5 hpo_fd_e5/;
-
-    $ua->post("http://aug-info:3036/LLM/import_embedding_dataset/29?preserve=1" => {Accept => '*/*'} => $result->{hpo_vaa_e5});
-    warn "did vaa: $result->{hpo_vaa_e5}";
-    $ua->post("http://aug-info:3036/LLM/import_embedding_dataset/25?preserve=1" => {Accept => '*/*'} => $result->{hpo_fd_e5});
-    warn "did fd: $result->{hpo_fd_e5}";
-
-    $self->render(text => 'OK');
-};
-
 get '/DBB/hpo/search/:query' => sub {
     my $self = shift;
     my $query = $self->param('query');
@@ -82,26 +41,26 @@ get '/DBB/hpo/search/:query' => sub {
     # HPO ist ein DAG. Wir bauen das Array Schritt für Schritt auf
     # und nehmen am Ende nur EINEN validen Pfad pro Treffer.
     my $sql = q{
-        WITH RECURSIVE search_tree AS (
-        -- Basis: Finde die passenden HPO Terms. Wir starten das Array mit dem Treffer.
-        SELECT t.id as match_id, t.id as current_id, ARRAY[t.id] as path
-        FROM public.terms t
-        WHERE t.label ILIKE ?
+                    WITH RECURSIVE search_tree AS (
+                    -- Basis: Finde die passenden HPO Terms. Wir starten das Array mit dem Treffer.
+                    SELECT t.id as match_id, t.id as current_id, ARRAY[t.id] as path
+                    FROM public.terms t
+                    WHERE t.label ILIKE ?
 
-        UNION ALL
+                    UNION ALL
 
-        -- Rekursion: Finde die Eltern-Knoten und setze sie VOR den bisherigen Pfad (|| Operator)
-        SELECT st.match_id, i.idparent as current_id, i.idparent || st.path
-        FROM search_tree st
-        JOIN public.isas i ON st.current_id = i.idchild
-        -- Optionaler Zirkelbezug-Schutz: WHERE NOT i.idparent = ANY(st.path)
-        )
-        -- DISTINCT ON (match_id) wählt für jeden Treffer exakt EINEN Pfad aus.
-        -- ORDER BY array_length stellt sicher, dass wir den längsten Pfad nehmen (der bis ganz zur Wurzel reicht).
-        SELECT DISTINCT ON (match_id) match_id, path
-        FROM search_tree
-        ORDER BY match_id, array_length(path, 1) DESC
-    };
+                    -- Rekursion: Finde die Eltern-Knoten und setze sie VOR den bisherigen Pfad (|| Operator)
+                    SELECT st.match_id, i.idparent as current_id, i.idparent || st.path
+                    FROM search_tree st
+                    JOIN public.isas i ON st.current_id = i.idchild
+                    -- Optionaler Zirkelbezug-Schutz: WHERE NOT i.idparent = ANY(st.path)
+                    )
+                    -- DISTINCT ON (match_id) wählt für jeden Treffer exakt EINEN Pfad aus.
+                    -- ORDER BY array_length stellt sicher, dass wir den längsten Pfad nehmen (der bis ganz zur Wurzel reicht).
+                    SELECT DISTINCT ON (match_id) match_id, path
+                    FROM search_tree
+                    ORDER BY match_id, array_length(path, 1) DESC
+                };
 
     my $sth = $self->db->prepare($sql);
     $sth->execute($search_term);

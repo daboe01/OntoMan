@@ -13,7 +13,7 @@
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
 {
-    var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(0, 0, 800, 600) styleMask:CPTitledWindowMask | CPResizableWindowMask];
+    var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(0, 0, 800, 600) styleMask:CPBorderlessBridgeWindowMask];
     [theWindow setTitle:@"Human Phenotype Ontology"];
     [theWindow center];
     
@@ -33,20 +33,32 @@
     [searchField setAction:@selector(searchAction:)];
     [contentView addSubview:searchField];
 
-    // 3. Setup Split View (Bottom)
+// 3. Setup Split View (Bottom)
     var splitView = [[CPSplitView alloc] initWithFrame:CGRectMake(20, 50, CGRectGetWidth(bounds) - 40, CGRectGetHeight(bounds) - 70)];
     [splitView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [splitView setVertical:YES]; // YES = Left/Right split panes
 
-    // --- LEFT PANE: Outline View ---
-    var leftScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, 400, CGRectGetHeight([splitView bounds]))];
+    // Calculate dynamic initial widths for 66% / 33% layout
+    var splitBounds = [splitView bounds];
+    var splitWidth = CGRectGetWidth(splitBounds);
+    var splitHeight = CGRectGetHeight(splitBounds);
+    var dividerWidth = [splitView dividerThickness];
+
+    var leftWidth = (splitWidth - dividerWidth) * 0.66;
+    var rightWidth = (splitWidth - dividerWidth) - leftWidth;
+
+    // --- LEFT PANE: Outline View (66%) ---
+    var leftScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, leftWidth, splitHeight)];
     [leftScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [leftScroll setAutohidesScrollers:NO];
 
     outlineView = [[CPOutlineView alloc] initWithFrame:[leftScroll bounds]];
     var column = [[CPTableColumn alloc] initWithIdentifier:@"name"];
     [[column headerView] setStringValue:@"HPO Terms"];
-    [column setWidth:380];
+    
+    // Make the outline view column fill the available space and resize responsively
+    [column setResizingMask:CPTableColumnAutoresizingMask];
+    [outlineView setColumnAutoresizingStyle:CPTableViewLastColumnOnlyAutoresizingStyle];
 
     [outlineView addTableColumn:column];
     [outlineView setOutlineTableColumn:column];
@@ -56,14 +68,16 @@
     [leftScroll setDocumentView:outlineView];
     [splitView addSubview:leftScroll];
 
-    // --- RIGHT PANE: Text View ---
-    var rightScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, 300, CGRectGetHeight([splitView bounds]))];
+    // --- RIGHT PANE: Text View (33%) ---
+    var rightScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight)];
     [rightScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [rightScroll setAutohidesScrollers:YES];
     
-    textView = [[CPTextView alloc] initWithFrame:[rightScroll bounds]];[textView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    textView = [[CPTextView alloc] initWithFrame:[rightScroll bounds]];
+    [textView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [textView setEditable:NO];
-    [textView setFont:[CPFont fontWithName:@"Courier" size:12.0]];[textView setString:@"Select an HPO term to see downstream codes."];
+    [textView setFont:[CPFont fontWithName:@"Courier" size:12.0]];
+    [textView setString:@"Select an HPO term to see downstream codes."];
     
     [rightScroll setDocumentView:textView];
     [splitView addSubview:rightScroll];
@@ -182,7 +196,7 @@
                     
                     // Wir starten bei der Wurzel (Ebene 0)
                     var partialPath = [CPIndexPath indexPathWithIndex:[currentPath indexAtPosition:0]];
-                    
+
                     // Wir gehen den Pfad hinab und klappen jeden Knoten auf
                     // (außer den letzten Knoten selbst, der ist ja der Treffer)
                     for (var level = 1; level < [currentPath length]; level++)

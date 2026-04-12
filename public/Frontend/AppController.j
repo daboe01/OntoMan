@@ -7,7 +7,8 @@
     CPTreeController treeController;
     CPOutlineView    outlineView;
     
-    // UI Elements (Now all are Table Views)
+    // UI Elements
+    CPTextView       definitionTextView;
     CPTableView      synonymsTableView;
     CPTableView      xrefsTableView;
     CPTableView      downstreamTableView;
@@ -24,7 +25,7 @@
     var theWindow = [[CPWindow alloc] initWithContentRect:CGRectMake(0, 0, 800, 600) styleMask:CPBorderlessBridgeWindowMask];
     [theWindow setTitle:@"Human Phenotype Ontology"];
     [theWindow center];
-    
+
     var contentView = [theWindow contentView];
     var bounds = [contentView bounds];
 
@@ -32,7 +33,7 @@
     treeController = [[CPTreeController alloc] init];
     [treeController setChildrenKeyPath:@"children"];
     [treeController setLeafKeyPath:@"isLeaf"];
-    
+
     _synonyms = [];
     _xrefs = [];
     _downstreamTerms = [];
@@ -83,11 +84,30 @@
     [rightSplitView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [rightSplitView setVertical:NO]; // Top/Bottom split panes
 
+    // SECTION 3.0: Definition TextView (NEW)
+    var defScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.25)]; // 25% height
+    [defScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [defScroll setAutohidesScrollers:YES];
+    [defScroll setHasHorizontalScroller:NO];
+
+    definitionTextView = [[CPTextView alloc] initWithFrame:[defScroll bounds]];
+    [definitionTextView setAutoresizingMask:CPViewWidthSizable];
+    [definitionTextView setEditable:NO];
+    [definitionTextView setSelectable:YES];
+
+    [defScroll setDocumentView:definitionTextView];
+
+    var defBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.25)];
+    [defBox setTitle:@"Definition"];
+    [defBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [[defBox contentView] addSubview:defScroll];
+    [rightSplitView addSubview:defBox];
+
+
     // SECTION 3.1: Xrefs TableView (Modified from TokenField)
-    var xrefScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.20)];
-    [xrefScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    var xrefScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.20)]; // 20% height[xrefScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [xrefScroll setAutohidesScrollers:YES];
-    
+
     xrefsTableView = [[CPTableView alloc] initWithFrame:[xrefScroll bounds]];
     var xrefCol = [[CPTableColumn alloc] initWithIdentifier:@"xref"];
     [[xrefCol headerView] setStringValue:@"Cross References"];
@@ -95,7 +115,7 @@
     [xrefsTableView addTableColumn:xrefCol];
     [xrefsTableView setDataSource:self];
     [xrefScroll setDocumentView:xrefsTableView];
-    
+
     // Create a generic wrapper to hold title + ScrollView
     var xrefBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.20)];
     [xrefBox setTitle:@"Cross References (Xrefs)"];
@@ -105,10 +125,10 @@
     [rightSplitView addSubview:xrefBox];
 
     // SECTION 3.2: Synonyms TableView
-    var synScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.40)];
+    var synScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.25)]; // 25% height
     [synScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [synScroll setAutohidesScrollers:YES];
-    
+
     synonymsTableView = [[CPTableView alloc] initWithFrame:[synScroll bounds]];
     var synCol = [[CPTableColumn alloc] initWithIdentifier:@"synonym"];
     [[synCol headerView] setStringValue:@"Synonyms"];
@@ -116,13 +136,13 @@
     [synonymsTableView addTableColumn:synCol];
     [synonymsTableView setDataSource:self];
     [synScroll setDocumentView:synonymsTableView];
-    [rightSplitView addSubview:synScroll];
+    [rightSplitView addSubview:synScroll]; // Scrollable already inside, could add a CPBox if desired to match the rest
 
-    // SECTION 3.3: Downstream Codes TableView (Modified from TextView)
-    var downScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.40)];
+    // SECTION 3.3: Downstream Codes TableView
+    var downScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.30)]; // 30% height
     [downScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [downScroll setAutohidesScrollers:YES];
-    
+
     downstreamTableView = [[CPTableView alloc] initWithFrame:[downScroll bounds]];
     
     var downIdCol = [[CPTableColumn alloc] initWithIdentifier:@"id"];
@@ -134,12 +154,12 @@
     [[downLabelCol headerView] setStringValue:@"Label"];
     [downLabelCol setWidth:rightWidth - 85];
     [downstreamTableView addTableColumn:downLabelCol];
-    
+
     [downstreamTableView setDataSource:self];
     [downScroll setDocumentView:downstreamTableView];
-    
-    // Add wrapper box for the Text View
-    var textBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.40)];
+
+    // Add wrapper box
+    var textBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.30)];
     [textBox setTitle:@"Downstream Nodes"];
     [textBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [[textBox contentView] addSubview:downScroll];
@@ -200,7 +220,7 @@
 
 - (void)fetchRoots
 {
-    var request =[CPURLRequest requestWithURL:"/DBB/hpo/roots"];
+    var request = [CPURLRequest requestWithURL:"/DBB/hpo/roots"];
     [CPURLConnection sendAsynchronousRequest:request
                                        queue:[CPOperationQueue mainQueue]
                            completionHandler:function(response, data, error) {
@@ -241,7 +261,7 @@
                                        queue:[CPOperationQueue mainQueue]
                            completionHandler:function(response, data, error) {
                                 if (!error && data) {
-                                    var json =[CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                                    var json = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
                                     [self expandAndSelectPaths:json];
                                 } else {
                                     CPLog("Fehler bei der Suche.");
@@ -251,7 +271,6 @@
 
 - (void)expandAndSelectPaths:(CPArray)searchResults
 {
-    // Sicherstellen, dass searchResults nicht null oder undefiniert ist
     if (!searchResults || searchResults.length === 0)
     {
         CPLog("Keine Treffer gefunden oder ungültige Server-Antwort.");
@@ -263,12 +282,9 @@
     var targetIndexPaths = [CPMutableArray array];
     var pendingPaths = searchResults.length;
 
-    // Wir gehen jeden gefundenen Pfad einzeln durch
     for (var i = 0; i < searchResults.length; i++)
     {
-        var nodeIds = searchResults[i].path; // z.B. [RootID, ChildID, MatchID]
-
-        [self resolvePath:nodeIds
+        var nodeIds = searchResults[i].path;[self resolvePath:nodeIds
              currentIndex:0
             currentModels:_allRoots
             baseIndexPath:nil
@@ -280,34 +296,25 @@
 
             pendingPaths--;
             
-            // Wenn alle Pfade fertig aufgelöst wurden, markieren wir sie im TreeController
             if (pendingPaths === 0)
             {
-                // 1. Selektion im Model setzen
                 [treeController setSelectionIndexPaths:targetIndexPaths];
 
-                // 2. Visuelles Aufklappen im CPOutlineView erzwingen
                 for (var idx = 0; idx < targetIndexPaths.length; idx++) {
                     var currentPath = targetIndexPaths[idx];
-                    
-                    // Wir starten bei der Wurzel (Ebene 0)
                     var partialPath = [CPIndexPath indexPathWithIndex:[currentPath indexAtPosition:0]];
 
-                    // Wir gehen den Pfad hinab und klappen jeden Knoten auf
-                    // (außer den letzten Knoten selbst, der ist ja der Treffer)
                     for (var level = 1; level < [currentPath length]; level++)
                     {
                         var treeNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:partialPath];
+
                         if (treeNode)
-                        {
                             [outlineView expandItem:treeNode];
-                        }
-                        // Nächste Ebene anhängen
+
                         partialPath = [partialPath indexPathByAddingIndex:[currentPath indexAtPosition:level]];
                     }
                 }
                 
-                // 3. Zum ersten Treffer scrollen, damit der Nutzer ihn sofort sieht!
                 if (targetIndexPaths.length > 0) {
                     var firstMatchNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:targetIndexPaths[0]];
                     var rowIndex = [outlineView rowForItem:firstMatchNode];
@@ -335,7 +342,6 @@
     var foundModelIndex = -1;
     var foundModel = nil;
 
-    // Finde das Modell mit der aktuellen ID in der aktuellen Ebene
     for (var i = 0; i < models.length; i++)
     {
         if ([models[i] termId] === targetId)
@@ -346,33 +352,27 @@
         }
     }
 
-    // Wenn der Knoten nicht gefunden wurde (Daten inkonsistent), brechen wir diesen Pfad ab
     if (!foundModel)
     {
         callback(nil);
         return;
     }
 
-    // CPIndexPath erweitern
-    var nextIndexPath = indexPath ? [indexPath indexPathByAddingIndex:foundModelIndex] : [CPIndexPath indexPathWithIndex:foundModelIndex];
+    var nextIndexPath = indexPath ?[indexPath indexPathByAddingIndex:foundModelIndex] : [CPIndexPath indexPathWithIndex:foundModelIndex];
 
-    // Sind wir am Ende des Pfades angekommen? (Das ist unser Treffer)
     if (index === nodeIds.length - 1)
     {
         callback(nextIndexPath);
     } 
     else
     {
-        // Wir müssen tiefer in den Baum. Sind die Kinder schon geladen?
         if ([foundModel hasLoadedChildren])
         {
             [self resolvePath:nodeIds currentIndex:(index + 1) currentModels:[foundModel children] baseIndexPath:nextIndexPath completion:callback];
         }
         else
         {
-            // Kinder asynchron vom Server laden
-            [foundModel fetchChildrenWithCompletion:function(newChildren) {
-                            [self resolvePath:nodeIds currentIndex:(index + 1) currentModels:newChildren baseIndexPath:nextIndexPath completion:callback];
+            [foundModel fetchChildrenWithCompletion:function(newChildren) {[self resolvePath:nodeIds currentIndex:(index + 1) currentModels:newChildren baseIndexPath:nextIndexPath completion:callback];
                       }];
         }
     }
@@ -381,27 +381,32 @@
 // --- Delegate Method: Triggers when the user selects a row ---
 - (void)outlineViewSelectionDidChange:(CPNotification)notification
 {
-    var selectedRow =[outlineView selectedRow];
-    
+    var selectedRow = [outlineView selectedRow];
+
     if (selectedRow === -1) {
+        // Clear all data if deselected
         _synonyms = [];
         _xrefs = [];
         _downstreamTerms = [];
+        [definitionTextView setString:@""]; // Clear definition text
+        
         [synonymsTableView reloadData];
         [xrefsTableView reloadData];
         [downstreamTableView reloadData];
         return;
     }
     
-    var item =[outlineView itemAtRow:selectedRow];
+    var item = [outlineView itemAtRow:selectedRow];
     var node = [item representedObject];
+    
+    // Set the definition text
+    [definitionTextView setString:[node definition] || @"No definition available."];
     
     // Fetch all metadata in parallel
     [self fetchDownstreamForNode:node];
     [self fetchSynonymsForNode:node];
     [self fetchXrefsForNode:node];
 }
-
 
 - (void)fetchDownstreamForNode:(HPONode)node
 {
@@ -411,7 +416,7 @@
                                        queue:[CPOperationQueue mainQueue]
                            completionHandler:function(response, data, error) {
         if (!error && data) {
-            _downstreamTerms = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] || [];
+            _downstreamTerms = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] ||[];
         }
         else {
             _downstreamTerms = [];
@@ -426,7 +431,7 @@
     var request = [CPURLRequest requestWithURL:urlString];
     [CPURLConnection sendAsynchronousRequest:request queue:[CPOperationQueue mainQueue] completionHandler:function(response, data, error) {
         if (!error && data) {
-            _synonyms = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] || [];
+            _synonyms = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] ||[];
         } else {
             _synonyms = [];
         }
@@ -438,13 +443,13 @@
 {
     var urlString = "/DBB/hpo/xrefs/" + [node termId];
     var request = [CPURLRequest requestWithURL:urlString];
+
     [CPURLConnection sendAsynchronousRequest:request queue:[CPOperationQueue mainQueue] completionHandler:function(response, data, error) {
         if (!error && data) {
             _xrefs = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] || [];
         } else {
             _xrefs = [];
-        }
-        [xrefsTableView reloadData];
+        }[xrefsTableView reloadData];
     }];
 }
 
@@ -482,6 +487,7 @@
 {
     int      termId            @accessors(property=termId);
     CPString name              @accessors(property=name);
+    CPString definition        @accessors(property=definition);
     BOOL     isLeaf            @accessors(property=isLeaf);
     CPArray  children;
     BOOL     hasLoadedChildren @accessors(property=hasLoadedChildren);
@@ -495,6 +501,7 @@
     {
         termId = dict.id;
         name = dict.label;
+        definition = dict.definition || @""; // Automatically parsed from JSON data if available
         
         // is_leaf is 0 for nodes with children, 1 for actual leaves
         isLeaf = (dict.is_leaf == 1); 
@@ -525,8 +532,9 @@
     if (self)
     {
         name = @"Loading...";
+        definition = @"";
         isLeaf = YES;
-        children =[];
+        children = [];
         hasLoadedChildren = YES; // Prevent the app from trying to fetch children for the dummy node
     }
     return self;
@@ -536,8 +544,7 @@
 - (void)setChildren:(CPArray)someChildren
 {
     [self willChangeValueForKey:@"children"];
-    children = someChildren;
-    [self didChangeValueForKey:@"children"];
+    children = someChildren;[self didChangeValueForKey:@"children"];
 }
 
 - (CPArray)children
@@ -553,8 +560,8 @@
     hasLoadedChildren = YES; // Mark early to prevent duplicate fetching
 
     var urlString = "/DBB/hpo/children/" + termId;
-    var request =[CPURLRequest requestWithURL:urlString];
-    
+    var request = [CPURLRequest requestWithURL:urlString];
+
     [CPURLConnection sendAsynchronousRequest:request
                                        queue:[CPOperationQueue mainQueue]
                            completionHandler:function(response, data, error) {

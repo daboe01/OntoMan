@@ -104,7 +104,7 @@ helper fetchFromTable => sub { my ($self, $table, $sessionid, $where)=@_;
 get '/DBB/hpo/roots' => sub {
     my $self = shift;
     my $sql = q{
-                    SELECT t.id, t.label,
+                    SELECT t.id, t.label, t.definition,
                     (CASE WHEN EXISTS (SELECT 1 FROM public.isas WHERE idparent = t.id) THEN 0 ELSE 1 END) as is_leaf
                     FROM public.terms t
                     WHERE t.id in (SELECT idparent FROM public.isas )
@@ -121,7 +121,7 @@ get '/DBB/hpo/children/:id' => [id => qr/.+/] => sub {
     my $self = shift;
     my $id = $self->param('id');
     my $sql = q{
-                    SELECT t.id, t.label,
+                    SELECT t.id, t.label,  t.definition,
                            (CASE WHEN EXISTS (SELECT 1 FROM public.isas WHERE idparent = t.id) THEN 0 ELSE 1 END) as is_leaf
                     FROM public.terms t
                     JOIN public.isas i ON t.id = i.idchild
@@ -138,7 +138,7 @@ get '/DBB/children/idparent/:pk' => [pk=>qr/[0-9]+/] => sub
 {    my $self = shift;
     my $pk  = $self->param('pk');
 
-    my $sql=qq{ select distinct terms.id, terms.label from all_childen_of(?) a join terms on terms.id = a.identity };
+    my $sql=qq{ select distinct terms.id, terms.label, terms.definition from all_childen_of(?) a join terms on terms.id = a.identity };
     my $sth = $self->db->prepare( $sql );
     $sth->execute(($pk));
 

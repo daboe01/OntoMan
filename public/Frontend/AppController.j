@@ -6,9 +6,17 @@
 {
     CPTreeController treeController;
     CPOutlineView    outlineView;
-    CPTextView       textView;
     
-    CPArray          _allRoots; // Store roots locally so we can filter them
+    // UI Elements (Now all are Table Views)
+    CPTableView      synonymsTableView;
+    CPTableView      xrefsTableView;
+    CPTableView      downstreamTableView;
+    
+    // Data stores
+    CPArray          _allRoots;
+    CPArray          _synonyms;
+    CPArray          _xrefs;
+    CPArray          _downstreamTerms;
 }
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
@@ -24,30 +32,33 @@
     treeController = [[CPTreeController alloc] init];
     [treeController setChildrenKeyPath:@"children"];
     [treeController setLeafKeyPath:@"isLeaf"];
+    
+    _synonyms = [];
+    _xrefs = [];
+    _downstreamTerms = [];
 
     // 2. Setup the Search Field (Top)
     var searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(20, 10, CGRectGetWidth(bounds) - 40, 30)];
-    [searchField setAutoresizingMask:CPViewWidthSizable | CPViewMaxYMargin]; // Pin to top
+    [searchField setAutoresizingMask:CPViewWidthSizable | CPViewMaxYMargin];
     [searchField setPlaceholderString:@"Filter Roots..."];
     [searchField setTarget:self];
     [searchField setAction:@selector(searchAction:)];
     [contentView addSubview:searchField];
 
-// 3. Setup Split View (Bottom)
+    // 3. Setup Split View (Bottom Main Left/Right)
     var splitView = [[CPSplitView alloc] initWithFrame:CGRectMake(20, 50, CGRectGetWidth(bounds) - 40, CGRectGetHeight(bounds) - 70)];
     [splitView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-    [splitView setVertical:YES]; // YES = Left/Right split panes
+    [splitView setVertical:YES]; // Left/Right split panes
 
-    // Calculate dynamic initial widths for 66% / 33% layout
     var splitBounds = [splitView bounds];
     var splitWidth = CGRectGetWidth(splitBounds);
     var splitHeight = CGRectGetHeight(splitBounds);
     var dividerWidth = [splitView dividerThickness];
 
-    var leftWidth = (splitWidth - dividerWidth) * 0.66;
+    var leftWidth = (splitWidth - dividerWidth) * 0.60;
     var rightWidth = (splitWidth - dividerWidth) - leftWidth;
 
-    // --- LEFT PANE: Outline View (66%) ---
+    // --- LEFT PANE: Outline View (60%) ---
     var leftScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, leftWidth, splitHeight)];
     [leftScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [leftScroll setAutohidesScrollers:NO];
@@ -56,7 +67,6 @@
     var column = [[CPTableColumn alloc] initWithIdentifier:@"name"];
     [[column headerView] setStringValue:@"HPO Terms"];
     
-    // Make the outline view column fill the available space and resize responsively
     [column setResizingMask:CPTableColumnAutoresizingMask];
     [outlineView setColumnAutoresizingStyle:CPTableViewLastColumnOnlyAutoresizingStyle];
 
@@ -68,20 +78,75 @@
     [leftScroll setDocumentView:outlineView];
     [splitView addSubview:leftScroll];
 
-    // --- RIGHT PANE: Text View (33%) ---
-    var rightScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight)];
-    [rightScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-    [rightScroll setAutohidesScrollers:YES];
-    
-    textView = [[CPTextView alloc] initWithFrame:[rightScroll bounds]];
-    [textView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
-    [textView setEditable:NO];
-    [textView setFont:[CPFont fontWithName:@"Courier" size:12.0]];
-    [textView setString:@"Select an HPO term to see downstream codes."];
-    
-    [rightScroll setDocumentView:textView];
-    [splitView addSubview:rightScroll];
+    // --- RIGHT PANE: Vertical Split View (40%) ---
+    var rightSplitView = [[CPSplitView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight)];
+    [rightSplitView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [rightSplitView setVertical:NO]; // Top/Bottom split panes
 
+    // SECTION 3.1: Xrefs TableView (Modified from TokenField)
+    var xrefScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.20)];
+    [xrefScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [xrefScroll setAutohidesScrollers:YES];
+    
+    xrefsTableView = [[CPTableView alloc] initWithFrame:[xrefScroll bounds]];
+    var xrefCol = [[CPTableColumn alloc] initWithIdentifier:@"xref"];
+    [[xrefCol headerView] setStringValue:@"Cross References"];
+    [xrefCol setWidth:rightWidth - 5];
+    [xrefsTableView addTableColumn:xrefCol];
+    [xrefsTableView setDataSource:self];
+    [xrefScroll setDocumentView:xrefsTableView];
+    
+    // Create a generic wrapper to hold title + ScrollView
+    var xrefBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.20)];
+    [xrefBox setTitle:@"Cross References (Xrefs)"];
+    [xrefBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [[xrefBox contentView] addSubview:xrefScroll];
+    
+    [rightSplitView addSubview:xrefBox];
+
+    // SECTION 3.2: Synonyms TableView
+    var synScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.40)];
+    [synScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [synScroll setAutohidesScrollers:YES];
+    
+    synonymsTableView = [[CPTableView alloc] initWithFrame:[synScroll bounds]];
+    var synCol = [[CPTableColumn alloc] initWithIdentifier:@"synonym"];
+    [[synCol headerView] setStringValue:@"Synonyms"];
+    [synCol setWidth:rightWidth - 5];
+    [synonymsTableView addTableColumn:synCol];
+    [synonymsTableView setDataSource:self];
+    [synScroll setDocumentView:synonymsTableView];
+    [rightSplitView addSubview:synScroll];
+
+    // SECTION 3.3: Downstream Codes TableView (Modified from TextView)
+    var downScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.40)];
+    [downScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [downScroll setAutohidesScrollers:YES];
+    
+    downstreamTableView = [[CPTableView alloc] initWithFrame:[downScroll bounds]];
+    
+    var downIdCol = [[CPTableColumn alloc] initWithIdentifier:@"id"];
+    [[downIdCol headerView] setStringValue:@"ID"];
+    [downIdCol setWidth:80];
+    [downstreamTableView addTableColumn:downIdCol];
+
+    var downLabelCol = [[CPTableColumn alloc] initWithIdentifier:@"label"];
+    [[downLabelCol headerView] setStringValue:@"Label"];
+    [downLabelCol setWidth:rightWidth - 85];
+    [downstreamTableView addTableColumn:downLabelCol];
+    
+    [downstreamTableView setDataSource:self];
+    [downScroll setDocumentView:downstreamTableView];
+    
+    // Add wrapper box for the Text View
+    var textBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.40)];
+    [textBox setTitle:@"Downstream Nodes"];
+    [textBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    [[textBox contentView] addSubview:downScroll];
+
+    [rightSplitView addSubview:textBox];
+
+    [splitView addSubview:rightSplitView];
     [contentView addSubview:splitView];
 
     // 4. Establish Bindings
@@ -92,6 +157,45 @@
 
     // 5. Kick off loading the root nodes
     [self fetchRoots];
+}
+
+
+// --- TableView Data Source (Synonyms, Xrefs, Downstream) ---
+
+- (int)numberOfRowsInTableView:(CPTableView)tableView
+{
+    if (tableView === synonymsTableView) {
+        return [_synonyms count];
+    }
+    if (tableView === xrefsTableView) {
+        return [_xrefs count];
+    }
+    if (tableView === downstreamTableView) {
+        return [_downstreamTerms count];
+    }
+    return 0;
+}
+
+- (id)tableView:(CPTableView)tableView objectValueForTableColumn:(CPTableColumn)tableColumn row:(int)row
+{
+    if (tableView === synonymsTableView) {
+        return _synonyms[row].label;
+    }
+    
+    if (tableView === xrefsTableView) {
+        return _xrefs[row].label;
+    }
+    
+    if (tableView === downstreamTableView) {
+        var term = _downstreamTerms[row];
+        if ([tableColumn identifier] === @"id") {
+            return term.id;
+        } else if ([tableColumn identifier] === @"label") {
+            return term.label;
+        }
+    }
+    
+    return nil;
 }
 
 - (void)fetchRoots
@@ -118,7 +222,6 @@
     }];
 }
 
-// --- NEU: Suche ans Backend senden ---
 - (void)searchAction:(id)sender
 {
     var searchString = [sender stringValue];
@@ -129,7 +232,7 @@
         [treeController setSelectionIndexPaths:[]];
         return;
     }
-    [textView setString:@"Suche läuft..."];
+    CPLog("Suche läuft...");
 
     var urlString = "/DBB/hpo/search/" + encodeURIComponent(searchString);
     var request = [CPURLRequest requestWithURL:urlString];
@@ -141,7 +244,7 @@
                                     var json =[CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
                                     [self expandAndSelectPaths:json];
                                 } else {
-                                    [textView setString:@"Fehler bei der Suche."];
+                                    CPLog("Fehler bei der Suche.");
                                 }
                             }];
 }
@@ -151,18 +254,11 @@
     // Sicherstellen, dass searchResults nicht null oder undefiniert ist
     if (!searchResults || searchResults.length === 0)
     {
-        [textView setString:@"Keine Treffer gefunden oder ungültige Server-Antwort."];
-        [treeController setSelectionIndexPaths:[]];
-
-        return;
-    }
-    if (searchResults.length === 0)
-    {
-        [textView setString:@"Keine Treffer gefunden."];
+        CPLog("Keine Treffer gefunden oder ungültige Server-Antwort.");
         [treeController setSelectionIndexPaths:[]];
         return;
     }
-    [textView setString:searchResults.length + @" Treffer gefunden. Lade Baumstruktur..."];
+    CPLog(searchResults.length + " Treffer gefunden. Lade Baumstruktur...");
 
     var targetIndexPaths = [CPMutableArray array];
     var pendingPaths = searchResults.length;
@@ -221,7 +317,8 @@
                     }
                 }
 
-                [textView setString:@"Alle Treffer markiert und aufgeklappt."];            }
+                CPLog("Alle Treffer markiert und aufgeklappt.");            
+            }
         }];
     }
 }
@@ -286,53 +383,71 @@
 {
     var selectedRow =[outlineView selectedRow];
     
-    if (selectedRow === -1) {[textView setString:@"Select an HPO term to see downstream codes."];
+    if (selectedRow === -1) {
+        _synonyms = [];
+        _xrefs = [];
+        _downstreamTerms = [];
+        [synonymsTableView reloadData];
+        [xrefsTableView reloadData];
+        [downstreamTableView reloadData];
         return;
     }
     
     var item =[outlineView itemAtRow:selectedRow];
     var node = [item representedObject];
     
-    if (node && ![node hasLoadedChildren] && [node isLeaf])
-    {
-        [textView setString:"ID: " + node.termId + " | " + node.name];
-    } else {
-        [self fetchDownstreamForNode:node];
-    }
+    // Fetch all metadata in parallel
+    [self fetchDownstreamForNode:node];
+    [self fetchSynonymsForNode:node];
+    [self fetchXrefsForNode:node];
 }
 
-// --- Call your backend '/DBB/children/idparent/:pk' endpoint ---
+
 - (void)fetchDownstreamForNode:(HPONode)node
 {
-    [textView setString:@"Loading downstream codes..."];
-
     var urlString = "/DBB/children/idparent/" + [node termId];
-    var request = [CPURLRequest requestWithURL:urlString];[CPURLConnection sendAsynchronousRequest:request
+    var request = [CPURLRequest requestWithURL:urlString];
+    [CPURLConnection sendAsynchronousRequest:request
                                        queue:[CPOperationQueue mainQueue]
                            completionHandler:function(response, data, error) {
         if (!error && data) {
-            var json =[CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            
-            var text = "Downstream terms for " +[node name] + ":\n";
-            text += "----------------------------------------\n";
-            
-            for (var i = 0; i < json.length; i++) {
-                text += "ID: " + json[i].id + " | " + json[i].label + "\n";
-            }
-            
-            if (json.length === 0) {
-                text = "No downstream codes found.";
-            }
-            
-            [textView setString:text];
-        } else
-        {
-            [textView setString:@"Failed to fetch downstream codes."];
+            _downstreamTerms = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] || [];
         }
+        else {
+            _downstreamTerms = [];
+        }
+        [downstreamTableView reloadData];
     }];
 }
 
-// --- Expansion Fix (From previous correction) ---
+- (void)fetchSynonymsForNode:(HPONode)node
+{
+    var urlString = "/DBB/hpo/synonyms/" + [node termId];
+    var request = [CPURLRequest requestWithURL:urlString];
+    [CPURLConnection sendAsynchronousRequest:request queue:[CPOperationQueue mainQueue] completionHandler:function(response, data, error) {
+        if (!error && data) {
+            _synonyms = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] || [];
+        } else {
+            _synonyms = [];
+        }
+        [synonymsTableView reloadData];
+    }];
+}
+
+- (void)fetchXrefsForNode:(HPONode)node
+{
+    var urlString = "/DBB/hpo/xrefs/" + [node termId];
+    var request = [CPURLRequest requestWithURL:urlString];
+    [CPURLConnection sendAsynchronousRequest:request queue:[CPOperationQueue mainQueue] completionHandler:function(response, data, error) {
+        if (!error && data) {
+            _xrefs = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] || [];
+        } else {
+            _xrefs = [];
+        }
+        [xrefsTableView reloadData];
+    }];
+}
+
 - (BOOL)outlineView:(CPOutlineView)anOutlineView shouldExpandItem:(id)anItem
 {
     var node = [anItem representedObject];
@@ -352,7 +467,8 @@
                     var dummyModel = [childModel children][0];
                     var dummyTreeNode = [[CPTreeNode alloc] initWithRepresentedObject:dummyModel];
                     [[childTreeNode mutableChildNodes] addObject:dummyTreeNode];
-                }[mutableChildNodes addObject:childTreeNode];
+                }
+                [mutableChildNodes addObject:childTreeNode];
             }
             [anOutlineView reloadItem:anItem reloadChildren:YES];
         }];
@@ -468,10 +584,6 @@
 
 @implementation CPJSONSerialization : CPObject
 
-/*!
-    Parses a JSON string and returns a JavaScript Object / CPArray / CPDictionary.
-    In Cappuccino, `data` from CPURLConnection is typically a CPString.
-*/
 + (id)JSONObjectWithData:(CPString)data options:(int)options error:(id)error
 {
     if (!data || [data length] === 0) {
@@ -479,19 +591,14 @@
     }
 
     try {
-        // Bridge directly to the native browser JSON parser
         return JSON.parse(data);
     } 
     catch (e) {
-        // In a more robust implementation, you would populate the 'error' reference here.
         CPLog.error(@"CPJSONSerialization Error parsing JSON: " + e.message);
         return nil;
     }
 }
 
-/*!
-    Converts a JavaScript Object, CPArray, or CPDictionary back into a JSON string.
-*/
 + (CPString)dataWithJSONObject:(id)object options:(int)options error:(id)error
 {
     if (!object) {
@@ -499,7 +606,6 @@
     }
 
     try {
-        // Bridge directly to the native browser JSON stringifier
         return JSON.stringify(object);
     } 
     catch (e) {
@@ -508,9 +614,6 @@
     }
 }
 
-/*!
-    Validates whether a given object can be safely converted to JSON.
-*/
 + (BOOL)isValidJSONObject:(id)object
 {
     if (!object) {

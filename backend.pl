@@ -145,24 +145,32 @@ get '/DBB/children/idparent/:pk' => [pk=>qr/[0-9]+/] => sub
     $self-> render(json => $sth->fetchall_arrayref({}));
 };
 
-get '/DBB/hpo_cleaned_vaa' => sub
-{
+# Fetch synonyms for a specific node
+get '/DBB/hpo/synonyms/:id' => [id => qr/.+/] => sub {
     my $self = shift;
-
-    my $sql = q{ select * from hpo_cleaned where code_system = 'vaa' order by 1 };
-    my $sth = $self->db->prepare( $sql );
-    $sth->execute();
+    my $id = $self->param('id');
+    my $sql = q{ SELECT distinct idterm, label FROM public.synonyms WHERE idterm = ? ORDER BY label };
+    my $sth = $self->db->prepare($sql);
+    $sth->execute($id);
 
     $self->render(json => $sth->fetchall_arrayref({}));
 };
 
-get '/DBB/hpo_cleaned_fd' => sub
-{
+# Fetch xrefs for a specific node
+get '/DBB/hpo/xrefs/:id' => [id => qr/.+/] => sub {
     my $self = shift;
-
-    my $sql = q{ select * from hpo_cleaned where code_system = 'fd' order by 1 };
-    my $sth = $self->db->prepare( $sql );
-    $sth->execute();
+    my $id = $self->param('id');
+    my $sql = q{
+                    SELECT distinct idterm, label
+                    FROM public.xrefs
+                    WHERE idterm = ?
+                    AND label NOT LIKE 'property_value%'
+                    AND label NOT LIKE 'created_by%'
+                    AND label NOT LIKE 'terms:%'
+                    ORDER BY label
+                };
+    my $sth = $self->db->prepare($sql);
+    $sth->execute($id);
 
     $self->render(json => $sth->fetchall_arrayref({}));
 };

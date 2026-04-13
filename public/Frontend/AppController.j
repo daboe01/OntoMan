@@ -444,13 +444,35 @@
     
     if (!node || [node isLeaf]) return YES;
 
+    // 1. CACHED DATA: Sync the tree node synchronously.
+    // The outline view will immediately animate the expansion of the REAL children.
+    if ([node hasLoadedChildren]) {
+        [self syncTreeNode:anItem withModelChildren:[node children]];
+        return YES;
+    }
+
+    // 2. ASYNC FETCH: We let the method return YES immediately so the Outline View 
+    // begins sliding down the "Loading..." dummy row.
+    // We record the time so we don't interrupt the animation prematurely.
+    var expandStartTime = [CPDate timeIntervalSinceReferenceDate];
+
     [node fetchChildrenWithCompletion:function(newChildren) {
         
-        // Sync the CPTreeNode proxies using our helper
-        [self syncTreeNode:anItem withModelChildren:newChildren];
+        var elapsed = [CPDate timeIntervalSinceReferenceDate] - expandStartTime;
+        var animationDuration = 0.25; // CPOutlineView default animation duration
         
-        // Force the outline view to refresh the item so the dummy node disappears visually
-        [anOutlineView reloadItem:anItem reloadChildren:YES];
+        // If the fetch was faster than the animation, calculate the remaining time
+        // Add a tiny 50ms buffer to guarantee the animation has completely cleared.
+        var delay = MAX(0, animationDuration - elapsed + 0.05);
+        
+        setTimeout(function() {
+            // Replace the "Loading..." proxy with the real ones
+            [self syncTreeNode:anItem withModelChildren:newChildren];
+            
+            // Refresh the outline view to snap the new rows in
+            [anOutlineView reloadItem:anItem reloadChildren:YES];
+            
+        }, delay * 1000); // setTimeout uses milliseconds
     }];
     
     return YES;

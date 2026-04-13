@@ -36,34 +36,41 @@ hook after_dispatch => sub {
 get '/DBB/hpo/search/:query' => sub {
     my $self = shift;
     my $query = $self->param('query');
+    my $name_only = $self->param('nameOnly') || '0'; # Read NameOnly flag (default: 0)
     my $search_term = "%$query%";
 
-    # HPO ist ein DAG. Wir bauen das Array Schritt für Schritt auf
-    # und nehmen am Ende nur EINEN validen Pfad pro Treffer.
-    my $sql = q{
+    my $base_where = "WHERE t.label ILIKE ?";
+    my @bind_params = ($search_term);
+
+    # If the Name Only flag wasn't set, expand the search to definitions and synonyms
+    if ($name_only eq 'false' || $name_only eq '0') {
+        $base_where = "WHERE t.label ILIKE ? OR t.definition ILIKE ? OR EXISTS (SELECT 1 FROM public.synonyms s WHERE s.idterm = t.id AND s.label ILIKE ?)";
+        push @bind_params, $search_term, $search_term;
+    }
+
+    # HPO is a DAG. We resolve exactly ONE valid path towards the root for each hit.
+    my $sql = qq{
                     WITH RECURSIVE search_tree AS (
-                    -- Basis: Finde die passenden HPO Terms. Wir starten das Array mit dem Treffer.
+                    -- Basis: Find matching HPO terms
                     SELECT t.id as match_id, t.id as current_id, ARRAY[t.id] as path
                     FROM public.terms t
-                    WHERE t.label ILIKE ?
+                    $base_where
 
                     UNION ALL
 
-                    -- Rekursion: Finde die Eltern-Knoten und setze sie VOR den bisherigen Pfad (|| Operator)
+                    -- Recursion: Walk upwards to the root
                     SELECT st.match_id, i.idparent as current_id, i.idparent || st.path
                     FROM search_tree st
                     JOIN public.isas i ON st.current_id = i.idchild
-                    -- Optionaler Zirkelbezug-Schutz: WHERE NOT i.idparent = ANY(st.path)
                     )
-                    -- DISTINCT ON (match_id) wählt für jeden Treffer exakt EINEN Pfad aus.
-                    -- ORDER BY array_length stellt sicher, dass wir den längsten Pfad nehmen (der bis ganz zur Wurzel reicht).
+                    -- For every matched ID, take just the longest single path back to the root
                     SELECT DISTINCT ON (match_id) match_id, path
                     FROM search_tree
                     ORDER BY match_id, array_length(path, 1) DESC
                 };
 
     my $sth = $self->db->prepare($sql);
-    $sth->execute($search_term);
+    $sth->execute(@bind_params);
 
     my $results = $sth->fetchall_arrayref({});
 
@@ -130,8 +137,10 @@ get '/DBB/hpo/children/:id' => [id => qr/.+/] => sub {
                 };
     my $sth = $self->db->prepare($sql);
     $sth->execute($id);
-    
-    $self->render(json => $sth->fetchall_arrayref({}));
+    my $a = $sth->fetchall_arrayref({});
+    warn Dumper $a;
+
+    $self->render(json => $a);
 };
 
 get '/DBB/children/idparent/:pk' => [pk=>qr/[0-9]+/] => sub

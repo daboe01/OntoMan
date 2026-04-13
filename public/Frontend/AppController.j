@@ -13,11 +13,19 @@
     CPTableView      xrefsTableView;
     CPTableView      downstreamTableView;
     
+    // Search UI elements
+    CPCheckBox       _nameOnlyCheckbox;
+    CPTextField      _searchStatusLabel;
+    
     // Data stores
     CPArray          _allRoots;
     CPArray          _synonyms;
     CPArray          _xrefs;
     CPArray          _downstreamTerms;
+    
+    // Search tracking
+    CPArray          _matchedIndexPaths;
+    int              _currentMatchIndex;
 }
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
@@ -37,14 +45,49 @@
     _synonyms = [];
     _xrefs = [];
     _downstreamTerms = [];
+    _matchedIndexPaths = [];
+    _currentMatchIndex = -1;
 
-    // 2. Setup the Search Field (Top)
-    var searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(20, 10, CGRectGetWidth(bounds) - 40, 30)];
+    // 2. Setup the Search Field & Controls (Top)
+    var topWidth = CGRectGetWidth(bounds) - 40;
+    var searchFieldWidth = topWidth - 270; // Reserve space for buttons/checkbox
+
+    var searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(20, 10, searchFieldWidth, 30)];
     [searchField setAutoresizingMask:CPViewWidthSizable | CPViewMaxYMargin];
-    [searchField setPlaceholderString:@"Filter Roots..."];
+    [searchField setPlaceholderString:@"Search terms, synonyms, defs..."];
     [searchField setTarget:self];
     [searchField setAction:@selector(searchAction:)];
     [contentView addSubview:searchField];
+
+    // Status Label ("1 of 5")
+    _searchStatusLabel = [[CPTextField alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 10, 15, 60, 20)];
+    [_searchStatusLabel setStringValue:@""];
+    [_searchStatusLabel setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
+    [_searchStatusLabel setAlignment:CPRightTextAlignment];
+    [contentView addSubview:_searchStatusLabel];
+
+    // Previous Button
+    var prevBtn = [[CPButton alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 80, 10, 30, 24)];
+    [prevBtn setTitle:@"<"];
+    [prevBtn setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
+    [prevBtn setTarget:self];
+    [prevBtn setAction:@selector(prevMatch:)];
+    [contentView addSubview:prevBtn];
+
+    // Next Button
+    var nextBtn = [[CPButton alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 115, 10, 30, 24)];
+    [nextBtn setTitle:@">"];
+    [nextBtn setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
+    [nextBtn setTarget:self];
+    [nextBtn setAction:@selector(nextMatch:)];
+    [contentView addSubview:nextBtn];
+
+    // Name Only Checkbox
+    _nameOnlyCheckbox = [[CPCheckBox alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 155, 12, 100, 20)];
+    [_nameOnlyCheckbox setTitle:@"Name only"];
+    [_nameOnlyCheckbox setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
+    [_nameOnlyCheckbox setState:CPOffState]; // Default is OFF (searches all)
+    [contentView addSubview:_nameOnlyCheckbox];
 
     // 3. Setup Split View (Bottom Main Left/Right)
     var splitView = [[CPSplitView alloc] initWithFrame:CGRectMake(20, 50, CGRectGetWidth(bounds) - 40, CGRectGetHeight(bounds) - 70)];
@@ -84,8 +127,8 @@
     [rightSplitView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [rightSplitView setVertical:NO]; // Top/Bottom split panes
 
-    // SECTION 3.0: Definition TextView (NEW)
-    var defScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.25)]; // 25% height
+    // SECTION 3.0: Definition TextView
+    var defScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.25)];
     [defScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [defScroll setAutohidesScrollers:YES];
     [defScroll setHasHorizontalScroller:NO];
@@ -103,9 +146,8 @@
     [[defBox contentView] addSubview:defScroll];
     [rightSplitView addSubview:defBox];
 
-
-    // SECTION 3.1: Xrefs TableView (Modified from TokenField)
-    var xrefScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.20)]; // 20% height[xrefScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    // SECTION 3.1: Xrefs TableView
+    var xrefScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.20)];
     [xrefScroll setAutohidesScrollers:YES];
 
     xrefsTableView = [[CPTableView alloc] initWithFrame:[xrefScroll bounds]];
@@ -116,16 +158,14 @@
     [xrefsTableView setDataSource:self];
     [xrefScroll setDocumentView:xrefsTableView];
 
-    // Create a generic wrapper to hold title + ScrollView
     var xrefBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.20)];
     [xrefBox setTitle:@"Cross References (Xrefs)"];
     [xrefBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [[xrefBox contentView] addSubview:xrefScroll];
-    
     [rightSplitView addSubview:xrefBox];
 
     // SECTION 3.2: Synonyms TableView
-    var synScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.25)]; // 25% height
+    var synScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.25)];
     [synScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [synScroll setAutohidesScrollers:YES];
 
@@ -136,10 +176,10 @@
     [synonymsTableView addTableColumn:synCol];
     [synonymsTableView setDataSource:self];
     [synScroll setDocumentView:synonymsTableView];
-    [rightSplitView addSubview:synScroll]; // Scrollable already inside, could add a CPBox if desired to match the rest
+    [rightSplitView addSubview:synScroll];
 
     // SECTION 3.3: Downstream Codes TableView
-    var downScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.30)]; // 30% height
+    var downScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.30)];
     [downScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [downScroll setAutohidesScrollers:YES];
 
@@ -158,7 +198,6 @@
     [downstreamTableView setDataSource:self];
     [downScroll setDocumentView:downstreamTableView];
 
-    // Add wrapper box
     var textBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.30)];
     [textBox setTitle:@"Downstream Nodes"];
     [textBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
@@ -180,8 +219,7 @@
 }
 
 
-// --- TableView Data Source (Synonyms, Xrefs, Downstream) ---
-
+// --- TableView Data Source ---
 - (int)numberOfRowsInTableView:(CPTableView)tableView
 {
     if (tableView === synonymsTableView) {
@@ -214,7 +252,7 @@
             return term.label;
         }
     }
-    
+
     return nil;
 }
 
@@ -227,7 +265,6 @@
         if (!error && data) {
             var json = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
             var roots = [CPMutableArray array];
-
             for (var i = 0; i < json.length; i++) {
                 var node = [[HPONode alloc] initWithDict:json[i]];
                 [roots addObject:node];
@@ -235,26 +272,47 @@
             
             _allRoots = roots; // Store a master copy for filtering
             [treeController setContent:_allRoots];
-            
         } else {
             CPLog("Failed to fetch HPO roots: %@", error);
         }
     }];
 }
 
+// --- Search Cycle Controls ---
+- (void)prevMatch:(id)sender
+{
+    if (!_matchedIndexPaths || _matchedIndexPaths.length === 0) return;
+    _currentMatchIndex--;
+    if (_currentMatchIndex < 0) _currentMatchIndex = _matchedIndexPaths.length - 1;
+    [self updateSelectionToCurrentMatch];
+}
+
+- (void)nextMatch:(id)sender
+{
+    if (!_matchedIndexPaths || _matchedIndexPaths.length === 0) return;
+    _currentMatchIndex++;
+    if (_currentMatchIndex >= _matchedIndexPaths.length) _currentMatchIndex = 0;
+    [self updateSelectionToCurrentMatch];
+}
+
+// --- Trigger Search ---
 - (void)searchAction:(id)sender
 {
     var searchString = [sender stringValue];
+    var isNameOnly = [_nameOnlyCheckbox state] === CPOnState;
     
     if (!searchString || [searchString length] === 0)
     {
-        // Wenn das Suchfeld leer ist, leeren wir die Selektion
         [treeController setSelectionIndexPaths:[]];
+        _matchedIndexPaths = [];
+        _currentMatchIndex = -1;
+        [_searchStatusLabel setStringValue:@""];
         return;
     }
     CPLog("Suche läuft...");
+    [_searchStatusLabel setStringValue:@"Searching..."];
 
-    var urlString = "/DBB/hpo/search/" + encodeURIComponent(searchString);
+    var urlString = "/DBB/hpo/search/" + encodeURIComponent(searchString) + "?nameOnly=" + (isNameOnly ? "1" : "0");
     var request = [CPURLRequest requestWithURL:urlString];
 
     [CPURLConnection sendAsynchronousRequest:request
@@ -265,117 +323,9 @@
                                     [self expandAndSelectPaths:json];
                                 } else {
                                     CPLog("Fehler bei der Suche.");
+                                    [_searchStatusLabel setStringValue:@"Error"];
                                 }
                             }];
-}
-
-- (void)expandAndSelectPaths:(CPArray)searchResults
-{
-    if (!searchResults || searchResults.length === 0)
-    {
-        CPLog("Keine Treffer gefunden oder ungültige Server-Antwort.");
-        [treeController setSelectionIndexPaths:[]];
-        return;
-    }
-    CPLog(searchResults.length + " Treffer gefunden. Lade Baumstruktur...");
-
-    var targetIndexPaths = [CPMutableArray array];
-    var pendingPaths = searchResults.length;
-
-    for (var i = 0; i < searchResults.length; i++)
-    {
-        var nodeIds = searchResults[i].path;[self resolvePath:nodeIds
-             currentIndex:0
-            currentModels:_allRoots
-            baseIndexPath:nil
-               completion:function(finalIndexPath) {
-
-                        if (finalIndexPath) {
-                            [targetIndexPaths addObject:finalIndexPath];
-                        }
-
-            pendingPaths--;
-            
-            if (pendingPaths === 0)
-            {
-                [treeController setSelectionIndexPaths:targetIndexPaths];
-
-                for (var idx = 0; idx < targetIndexPaths.length; idx++) {
-                    var currentPath = targetIndexPaths[idx];
-                    var partialPath = [CPIndexPath indexPathWithIndex:[currentPath indexAtPosition:0]];
-
-                    for (var level = 1; level < [currentPath length]; level++)
-                    {
-                        var treeNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:partialPath];
-
-                        if (treeNode)
-                            [outlineView expandItem:treeNode];
-
-                        partialPath = [partialPath indexPathByAddingIndex:[currentPath indexAtPosition:level]];
-                    }
-                }
-                
-                if (targetIndexPaths.length > 0) {
-                    var firstMatchNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:targetIndexPaths[0]];
-                    var rowIndex = [outlineView rowForItem:firstMatchNode];
-                    
-                    if (rowIndex >= 0) {
-                        [outlineView scrollRowToVisible:rowIndex];
-                    }
-                }
-
-                CPLog("Alle Treffer markiert und aufgeklappt.");            
-            }
-        }];
-    }
-}
-
-- (void)resolvePath:(CPArray)nodeIds currentIndex:(int)index currentModels:(CPArray)models baseIndexPath:(NSIndexPath)indexPath completion:(Function)callback
-{
-    if (index >= nodeIds.length)
-    {
-        callback(indexPath);
-        return;
-    }
-
-    var targetId = parseInt(nodeIds[index], 10);
-    var foundModelIndex = -1;
-    var foundModel = nil;
-
-    for (var i = 0; i < models.length; i++)
-    {
-        if ([models[i] termId] === targetId)
-        {
-            foundModelIndex = i;
-            foundModel = models[i];
-            break;
-        }
-    }
-
-    if (!foundModel)
-    {
-        callback(nil);
-        return;
-    }
-
-    var nextIndexPath = indexPath ?[indexPath indexPathByAddingIndex:foundModelIndex] : [CPIndexPath indexPathWithIndex:foundModelIndex];
-
-    if (index === nodeIds.length - 1)
-    {
-        callback(nextIndexPath);
-    } 
-    else
-    {
-        if ([foundModel hasLoadedChildren])
-        {
-            [self resolvePath:nodeIds currentIndex:(index + 1) currentModels:[foundModel children] baseIndexPath:nextIndexPath completion:callback];
-        }
-        else
-        {
-            [foundModel fetchChildrenWithCompletion:function(newChildren) {[self resolvePath:nodeIds currentIndex:(index + 1) currentModels:newChildren baseIndexPath:nextIndexPath completion:callback];
-                      }];
-        }
-    }
 }
 
 // --- Delegate Method: Triggers when the user selects a row ---
@@ -399,10 +349,8 @@
     var item = [outlineView itemAtRow:selectedRow];
     var node = [item representedObject];
     
-    // Set the definition text
     [definitionTextView setString:[node definition] || @"No definition available."];
     
-    // Fetch all metadata in parallel
     [self fetchDownstreamForNode:node];
     [self fetchSynonymsForNode:node];
     [self fetchXrefsForNode:node];
@@ -453,33 +401,193 @@
     }];
 }
 
+// --- 1. Helper method to properly build CPTreeNode proxies ---
+- (void)syncTreeNode:(CPTreeNode)treeNode withModelChildren:(CPArray)newChildren
+{
+    if (!treeNode) return;
+    
+    var mutableChildNodes = [treeNode mutableChildNodes];
+    
+    // Safety check: ensure we are operating on the CPTreeNode proxy using proper Obj-J methods
+    if ([mutableChildNodes count] > 0)
+    {
+        var firstChildObj = [[mutableChildNodes objectAtIndex:0] representedObject];
+        if ([firstChildObj name] !== @"Loading...") {
+            return; // Already synced
+        }
+    } else if ([mutableChildNodes count] === 0 && [newChildren count] === 0) {
+        return; // Empty node
+    }
+
+    // Clear the dummy proxy
+    [mutableChildNodes removeAllObjects];
+    
+    for (var i = 0; i < [newChildren count]; i++) {
+        var childModel = newChildren[i];
+        var childTreeNode = [[CPTreeNode alloc] initWithRepresentedObject:childModel];
+        
+        // If the model is not a leaf, recreate its dummy proxy so the UI draws a disclosure triangle
+        if (![childModel isLeaf] && [[childModel children] count] > 0) {
+            var dummyModel = [[childModel children] objectAtIndex:0];
+            var dummyTreeNode = [[CPTreeNode alloc] initWithRepresentedObject:dummyModel];
+            [[childTreeNode mutableChildNodes] addObject:dummyTreeNode];
+        }
+        
+        [mutableChildNodes addObject:childTreeNode];
+    }
+}
+
+// --- 2. Fixed shouldExpandItem ---
 - (BOOL)outlineView:(CPOutlineView)anOutlineView shouldExpandItem:(id)anItem
 {
     var node = [anItem representedObject];
     
-    if (node && ![node isLeaf] && ![node hasLoadedChildren])
-    {
-        [node fetchChildrenWithCompletion:function(newChildren) {
-            var mutableChildNodes = [anItem mutableChildNodes];
-            [mutableChildNodes removeAllObjects];
-            
-            for (var i = 0; i < newChildren.length; i++) {
-                var childModel = newChildren[i];
-                var childTreeNode = [[CPTreeNode alloc] initWithRepresentedObject:childModel];
-                
-                // If it's a branch, manually inject the dummy tree node
-                if (![childModel isLeaf] && [[childModel children] count] > 0) {
-                    var dummyModel = [childModel children][0];
-                    var dummyTreeNode = [[CPTreeNode alloc] initWithRepresentedObject:dummyModel];
-                    [[childTreeNode mutableChildNodes] addObject:dummyTreeNode];
-                }
-                [mutableChildNodes addObject:childTreeNode];
-            }
-            [anOutlineView reloadItem:anItem reloadChildren:YES];
-        }];
-    }
+    if (!node || [node isLeaf]) return YES;
+
+    [node fetchChildrenWithCompletion:function(newChildren) {
+        
+        // Sync the CPTreeNode proxies using our helper
+        [self syncTreeNode:anItem withModelChildren:newChildren];
+        
+        // Force the outline view to refresh the item so the dummy node disappears visually
+        [anOutlineView reloadItem:anItem reloadChildren:YES];
+    }];
+    
     return YES;
 }
+
+// --- 3. Fixed resolvePath: ensuring background searches build the proxy tree ---
+- (void)resolvePath:(CPArray)nodeIds currentIndex:(int)index currentModels:(CPArray)models baseIndexPath:(CPIndexPath)indexPath completion:(Function)callback
+{
+    if (index >= nodeIds.length) {
+        callback(indexPath);
+        return;
+    }
+
+    var targetId = parseInt(nodeIds[index], 10);
+    var foundModelIndex = -1;
+    var foundModel = nil;
+
+    for (var i = 0; i < [models count]; i++) {
+        if ([models[i] termId] === targetId) {
+            foundModelIndex = i;
+            foundModel = models[i];
+            break;
+        }
+    }
+
+    if (!foundModel) {
+        callback(nil);
+        return;
+    }
+
+    var nextIndexPath = indexPath ? [indexPath indexPathByAddingIndex:foundModelIndex] : [CPIndexPath indexPathWithIndex:foundModelIndex];
+
+    if (index === nodeIds.length - 1) {
+        callback(nextIndexPath);
+    } else {
+        [foundModel fetchChildrenWithCompletion:function(newChildren) {
+            
+            // CRITICAL FIX: Ensure the CPTreeNode proxy exists for the deep path so updateSelectionToCurrentMatch can find it later
+            var treeNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:nextIndexPath];
+            if (treeNode) {
+                [self syncTreeNode:treeNode withModelChildren:newChildren];
+            }
+            
+            [self resolvePath:nodeIds currentIndex:(index + 1) currentModels:newChildren baseIndexPath:nextIndexPath completion:callback];
+        }];
+    }
+}
+
+// --- 4. Fixed Search Selection UI ---
+- (void)updateSelectionToCurrentMatch
+{
+    if (!_matchedIndexPaths || [_matchedIndexPaths count] === 0) {
+        [_searchStatusLabel setStringValue:@"0 of 0"];
+        return;
+    }
+    
+    var path = _matchedIndexPaths[_currentMatchIndex];
+    
+    // Iteratively expand parents
+    var partialPath = [CPIndexPath indexPathWithIndex:[path indexAtPosition:0]];
+    for (var level = 1; level < [path length]; level++) {
+        var treeNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:partialPath];
+        if (treeNode) {
+            [outlineView expandItem:treeNode];
+        }
+        partialPath = [partialPath indexPathByAddingIndex:[path indexAtPosition:level]];
+    }
+    
+    // Select the target item
+    [treeController setSelectionIndexPath:path];
+    [_searchStatusLabel setStringValue:(_currentMatchIndex + 1) + @" of " + [_matchedIndexPaths count]];
+    
+    // Give the view layout engine time to create the visual rows before attempting to scroll to them
+    setTimeout(function() {
+        var node = [[treeController arrangedObjects] descendantNodeAtIndexPath:path];
+        if (node) {
+            var rowIndex = [outlineView rowForItem:node];
+            if (rowIndex >= 0) {
+                [outlineView scrollRowToVisible:rowIndex];
+            } else {
+                CPLog.warn("Target row index is -1. Layout incomplete for path: " + [path description]);
+            }
+        }
+    }, 300);
+}
+
+- (void)expandAndSelectPaths:(CPArray)searchResults
+{
+    if (!searchResults || searchResults.length === 0)
+    {
+        CPLog("Keine Treffer gefunden.");
+        [treeController setSelectionIndexPaths:[]];
+        _matchedIndexPaths = [];
+        _currentMatchIndex = -1;
+        [_searchStatusLabel setStringValue:@"0 hits"];
+        return;
+    }
+    
+    CPLog(searchResults.length + " Treffer gefunden. Lade Baumstruktur...");
+
+    var targetIndexPaths = [CPMutableArray array];
+    var pendingPaths = searchResults.length;
+
+    for (var i = 0; i < searchResults.length; i++)
+    {
+        var nodeIds = searchResults[i].path;
+        
+        [self resolvePath:nodeIds
+             currentIndex:0
+            currentModels:_allRoots
+            baseIndexPath:nil
+               completion:function(finalIndexPath) {
+
+            if (finalIndexPath) {
+                [targetIndexPaths addObject:finalIndexPath];
+            }
+
+            pendingPaths--;
+            
+            if (pendingPaths === 0)
+            {
+                _matchedIndexPaths = targetIndexPaths;
+                _currentMatchIndex = 0;
+                
+                // crucial: Give CPTreeController's KVO time to process all the loaded children 
+                // BEFORE attempting to traverse descendantNodeAtIndexPath in the update method.
+                setTimeout(function() {
+                    [self updateSelectionToCurrentMatch];
+                }, 50);
+                
+                CPLog("Alle Treffer aufgelöst und der erste wurde markiert.");            
+            }
+        }];
+    }
+}
+
+
 @end
 
 // --- Custom Data Model representing a single HPO Node ---
@@ -491,6 +599,8 @@
     BOOL     isLeaf            @accessors(property=isLeaf);
     CPArray  children;
     BOOL     hasLoadedChildren @accessors(property=hasLoadedChildren);
+    BOOL     _isFetching;
+    CPArray  _fetchCallbacks;
 }
 
 - (id)initWithDict:(JSObject)dict
@@ -544,7 +654,8 @@
 - (void)setChildren:(CPArray)someChildren
 {
     [self willChangeValueForKey:@"children"];
-    children = someChildren;[self didChangeValueForKey:@"children"];
+    children = someChildren;
+    [self didChangeValueForKey:@"children"];
 }
 
 - (CPArray)children
@@ -554,10 +665,26 @@
 
 - (void)fetchChildrenWithCompletion:(Function)completion
 {
-    if (hasLoadedChildren)
+    // 1. If already loaded, return immediately
+    if (hasLoadedChildren) {
+        if (completion) completion(children);
+        return;
+    }
+
+    // 2. Queue the callback
+    if (!_fetchCallbacks)
+    {
+        _fetchCallbacks = [];
+    }
+    if (completion) {
+        [_fetchCallbacks addObject:completion];
+    }
+
+    // 3. If already fetching, just wait for it to finish
+    if (_isFetching)
         return;
 
-    hasLoadedChildren = YES; // Mark early to prevent duplicate fetching
+    _isFetching = YES;
 
     var urlString = "/DBB/hpo/children/" + termId;
     var request = [CPURLRequest requestWithURL:urlString];
@@ -565,28 +692,37 @@
     [CPURLConnection sendAsynchronousRequest:request
                                        queue:[CPOperationQueue mainQueue]
                            completionHandler:function(response, data, error) {
-        if (!error && data) {
+        _isFetching = NO;
+        if (!error && data)
+        {
             var json = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
             var newChildren = [CPMutableArray array];
-            
+
             for (var i = 0; i < json.length; i++) {
                 var childNode = [[HPONode alloc] initWithDict:json[i]];
                 [newChildren addObject:childNode];
             }
             
-            // Update the model (fires KVO, but TreeController ignores it)
+            hasLoadedChildren = YES;
             [self setChildren:newChildren];
             
-            // Ping the AppController that we are done
-            if (completion) {
-                completion(newChildren);
+            // Execute all queued callbacks
+            var callbacksToRun = [_fetchCallbacks copy];
+            [_fetchCallbacks removeAllObjects];
+            for (var i = 0; i < callbacksToRun.length; i++) {
+                callbacksToRun[i](newChildren);
             }
         } else {
-            hasLoadedChildren = NO; 
             CPLog("Failed to load children for term id %@: %@", termId, error);
+            var callbacksToRun = [_fetchCallbacks copy];
+            [_fetchCallbacks removeAllObjects];
+            for (var i = 0; i < callbacksToRun.length; i++) {
+                callbacksToRun[i]([]); // Return empty on error to prevent hanging
+            }
         }
     }];
 }
+
 @end
 
 @implementation CPJSONSerialization : CPObject

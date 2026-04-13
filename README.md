@@ -95,7 +95,7 @@ morbo backend.pl
 Open your browser and navigate to `http://localhost:3000`.
 
 ## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](link-to-issues).
+Contributions, issues, and feature requests are welcome!
 
 ## 📄 License
 * This project is licensed under the MIT License.

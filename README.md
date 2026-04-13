@@ -22,7 +22,6 @@ This project provides a lightning-fast native-like GUI in the browser using **Ca
 Before you begin, ensure you have the following installed:
 * **PostgreSQL** (v10+)
 * **Perl** (with `Mojolicous`, `DBI`, `DBD::Pg`, and `SQL::Abstract` modules)
-* **Cappuccino** 
 
 ## 🚀 Installation & Setup
 

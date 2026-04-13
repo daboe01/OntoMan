@@ -137,10 +137,8 @@ get '/DBB/hpo/children/:id' => [id => qr/.+/] => sub {
                 };
     my $sth = $self->db->prepare($sql);
     $sth->execute($id);
-    my $a = $sth->fetchall_arrayref({});
-    warn Dumper $a;
 
-    $self->render(json => $a);
+    $self->render(json => $sth->fetchall_arrayref({}));
 };
 
 get '/DBB/children/idparent/:pk' => [pk=>qr/[0-9]+/] => sub

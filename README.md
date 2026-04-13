@@ -2,7 +2,7 @@
 
 A full-stack, desktop-class web application for navigating, searching, and inspecting the [Human Phenotype Ontology (HPO)](https://hpo.jax.org/). 
 
-This project provides a lightning-fast native-like GUI in the browser using **Cappuccino (Objective-J)**, backed by a **PostgreSQL** database and a **Perl** backend. It efficiently parses raw `.obo` files, imports them into a relational schema, and serves them via an asynchronous, lazy-loading interface.
+This project provides a lightning-fast native-like GUI in the browser using **Cappuccino (Objective-J)**, backed by a **PostgreSQL** database and a **Mojolicous** (Perl) backend. It efficiently parses raw `.obo` files, imports them into a relational schema, and serves them via an asynchronous, lazy-loading interface.
 
 <img width="1195" height="907" alt="Bildschirmfoto 2026-04-13 um 10 19 35" src="https://github.com/user-attachments/assets/6cfc0ae7-4b7c-4539-a062-cad49ab77c2a" />
 
@@ -16,21 +16,12 @@ This project provides a lightning-fast native-like GUI in the browser using **Ca
   * Synonyms
   * Cross-References (Xrefs - e.g., UMLS, SNOMED)
   * Downstream/Child Nodes
-* **High-Performance Parser:** A custom Perl script utilizing transactions to rapidly parse massive `.obo` files and populate the relational database.
-
-## 🛠️ Tech Stack
-
-* **Frontend:**[Cappuccino](http://www.cappuccino.dev/) (Objective-J)
-* **Database:** PostgreSQL
-* **Data Ingestion:** Perl (`DBI`, `SQL::Abstract`, `Mojo::File`)
-* **API Backend:**  Mojolicious serving endpoints to `/DBB/...`
 
 ## 📦 Prerequisites
 
 Before you begin, ensure you have the following installed:
 * **PostgreSQL** (v10+)
 * **Perl** (with `Mojolicous`, `DBI`, `DBD::Pg`, and `SQL::Abstract` modules)
-* **Cappuccino** 
 
 ## 🚀 Installation & Setup
 
@@ -85,7 +76,7 @@ The frontend expects a backend serving JSON at the following endpoints (relative
 * `GET /DBB/hpo/xrefs/:id` - Returns cross-references for a given term.
 * `GET /DBB/children/idparent/:id` - Returns all downstream child node metadata.
 
-### 4. Build and Run the Frontend
+### 4. Run the Frontend
 Navigate to your Cappuccino project directory and run:
 
 ```bash

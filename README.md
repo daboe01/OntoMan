@@ -17,13 +17,6 @@ This project provides a lightning-fast native-like GUI in the browser using **Ca
   * Cross-References (Xrefs - e.g., UMLS, SNOMED)
   * Downstream/Child Nodes
 
-## 🛠️ Tech Stack
-
-* **Frontend:**[Cappuccino](http://www.cappuccino.dev/) (Objective-J)
-* **Database:** PostgreSQL
-* **Data Ingestion:** Perl (`DBI`, `SQL::Abstract`, `Mojo::File`)
-* **API Backend:**  Mojolicious serving endpoints to `/DBB/...`
-
 ## 📦 Prerequisites
 
 Before you begin, ensure you have the following installed:

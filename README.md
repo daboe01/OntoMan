@@ -76,7 +76,7 @@ The frontend expects a backend serving JSON at the following endpoints (relative
 * `GET /DBB/hpo/xrefs/:id` - Returns cross-references for a given term.
 * `GET /DBB/children/idparent/:id` - Returns all downstream child node metadata.
 
-### 4. Build and Run the Frontend
+### 4. Run the Frontend
 Navigate to your Cappuccino project directory and run:
 
 ```bash

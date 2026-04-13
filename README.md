@@ -23,14 +23,14 @@ This project provides a lightning-fast native-like GUI in the browser using **Ca
 * **Frontend:**[Cappuccino](http://www.cappuccino.dev/) (Objective-J)
 * **Database:** PostgreSQL
 * **Data Ingestion:** Perl (`DBI`, `SQL::Abstract`, `Mojo::File`)
-* **API Backend:** Your preferred web framework (e.g., Mojolicious, Node.js) serving endpoints to `/DBB/...`
+* **API Backend:**  Mojolicious serving endpoints to `/DBB/...`
 
 ## 📦 Prerequisites
 
 Before you begin, ensure you have the following installed:
 * **PostgreSQL** (v10+)
-* **Perl** (with `Mojo::File`, `DBI`, `DBD::Pg`, and `SQL::Abstract` modules)
-* **Cappuccino** build tools (`jake`)
+* **Perl** (with `Mojolicous`, `DBI`, `DBD::Pg`, and `SQL::Abstract` modules)
+* **Cappuccino** 
 
 ## 🚀 Installation & Setup
 
@@ -89,13 +89,10 @@ The frontend expects a backend serving JSON at the following endpoints (relative
 Navigate to your Cappuccino project directory and run:
 
 ```bash
-# Build the project
-jake build
-
-# Serve the application (e.g., using a simple Python server or your backend of choice)
-python3 -m http.server 8000
+cd /path/to/your/backend
+morbo backend.pl
 ```
-Open your browser and navigate to `http://localhost:8000`.
+Open your browser and navigate to `http://localhost:3000`.
 
 ## 🤝 Contributing
 Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](link-to-issues).

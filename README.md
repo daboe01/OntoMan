@@ -4,7 +4,7 @@ A full-stack, desktop-class web application for navigating, searching, and inspe
 
 This project provides a lightning-fast native-like GUI in the browser using **Cappuccino (Objective-J)**, backed by a **PostgreSQL** database and a **Perl** backend. It efficiently parses raw `.obo` files, imports them into a relational schema, and serves them via an asynchronous, lazy-loading interface.
 
-![Screenshot Placeholder](https://via.placeholder.com/800x450.png?text=Add+a+Screenshot+of+your+Cappuccino+App+Here)
+<img width="1184" height="817" alt="screenshot" src="https://github.com/user-attachments/assets/2678d41d-c6ce-4400-830c-fc6b0124cc0f" />
 
 ## ✨ Features
 

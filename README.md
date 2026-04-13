@@ -16,7 +16,6 @@ This project provides a lightning-fast native-like GUI in the browser using **Ca
   * Synonyms
   * Cross-References (Xrefs - e.g., UMLS, SNOMED)
   * Downstream/Child Nodes
-* **High-Performance Parser:** A custom Perl script utilizing transactions to rapidly parse massive `.obo` files and populate the relational database.
 
 ## 🛠️ Tech Stack
 

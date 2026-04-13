@@ -1,12 +1,3 @@
-
-
-
-Here is a comprehensive and polished `README.md` for your GitHub repository. It covers the full stack we've built, from the Perl parser to the Objective-J/Cappuccino frontend. 
-
-You can easily copy and paste this into your repo.
-
-***
-
 # 🧬 Human Phenotype Ontology (HPO) Browser
 
 A full-stack, desktop-class web application for navigating, searching, and inspecting the [Human Phenotype Ontology (HPO)](https://hpo.jax.org/). 

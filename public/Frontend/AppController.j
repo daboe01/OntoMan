@@ -157,7 +157,8 @@
     [xrefsTableView addTableColumn:xrefCol];
     [xrefsTableView setDataSource:self];
     [xrefScroll setDocumentView:xrefsTableView];
-
+    [xrefScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+    
     var xrefBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.20)];
     [xrefBox setTitle:@"Cross References (Xrefs)"];
     [xrefBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];

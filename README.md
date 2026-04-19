@@ -26,34 +26,19 @@ Before you begin, ensure you have the following installed:
 ## 🚀 Installation & Setup
 
 ### 1. Database Setup
-Create a PostgreSQL database named `hpo` and run the following SQL script to set up the schema:
+Create a PostgreSQL database named `hpo` and run the newly added `sql_template.sql` script to set up the schema. 
 
-```sql
-CREATE DATABASE hpo;
-\c hpo;
+From your terminal, run:
 
-CREATE TABLE terms (
-    id VARCHAR(20) PRIMARY KEY,
-    label TEXT,
-    definition TEXT,
-    comment TEXT
-);
+```bash
+# Create the database
+createdb hpo
 
-CREATE TABLE synonyms (
-    idterm VARCHAR(20) REFERENCES terms(id) ON DELETE CASCADE,
-    label TEXT
-);
-
-CREATE TABLE xrefs (
-    idterm VARCHAR(20) REFERENCES terms(id) ON DELETE CASCADE,
-    label TEXT
-);
-
-CREATE TABLE isas (
-    idchild VARCHAR(20) REFERENCES terms(id) ON DELETE CASCADE,
-    idparent VARCHAR(20) REFERENCES terms(id) ON DELETE CASCADE
-);
+# Import the schema from the template file
+psql -d hpo -f sql_template.sql
 ```
+
+*(Alternatively, if you are logged into the `psql` console, you can run `CREATE DATABASE hpo; \c hpo; \i sql_template.sql`)*
 
 ### 2. Import the OBO File
 Download the latest `hp.obo` file from the[HPO Consortium](http://www.human-phenotype-ontology.org/). Update the file path in the Perl script (`import.pl`), and run it:

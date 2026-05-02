@@ -67,7 +67,7 @@
     [contentView addSubview:_searchStatusLabel];
 
     // Previous Button
-    var prevBtn = [[CPButton alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 80, 10, 30, 24)];
+    var prevBtn = [[CPButton alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 80, 13, 30, 24)];
     [prevBtn setTitle:@"<"];
     [prevBtn setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
     [prevBtn setTarget:self];
@@ -75,7 +75,7 @@
     [contentView addSubview:prevBtn];
 
     // Next Button
-    var nextBtn = [[CPButton alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 115, 10, 30, 24)];
+    var nextBtn = [[CPButton alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 115, 13, 30, 24)];
     [nextBtn setTitle:@">"];
     [nextBtn setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
     [nextBtn setTarget:self];
@@ -83,7 +83,7 @@
     [contentView addSubview:nextBtn];
 
     // Name Only Checkbox
-    _nameOnlyCheckbox = [[CPCheckBox alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 155, 12, 100, 20)];
+    _nameOnlyCheckbox = [[CPCheckBox alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 155, 15, 100, 20)];
     [_nameOnlyCheckbox setTitle:@"Name only"];
     [_nameOnlyCheckbox setAutoresizingMask:CPViewMinXMargin | CPViewMaxYMargin];
     [_nameOnlyCheckbox setState:CPOffState]; // Default is OFF (searches all)

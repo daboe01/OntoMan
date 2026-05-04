@@ -350,8 +350,8 @@
     var item = [outlineView itemAtRow:selectedRow];
     var node = [item representedObject];
     
-    [definitionTextView setString:[node definition] || @"No definition available."];
-    
+    [definitionTextView setString: [node definition]  + ' (' + node.termId + ')' || @"No definition available."] ;
+
     [self fetchDownstreamForNode:node];
     [self fetchSynonymsForNode:node];
     [self fetchXrefsForNode:node];

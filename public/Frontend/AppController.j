@@ -152,6 +152,7 @@
 
     xrefsTableView = [[CPTableView alloc] initWithFrame:[xrefScroll bounds]];
     var xrefCol = [[CPTableColumn alloc] initWithIdentifier:@"xref"];
+    [xrefCol setSortDescriptorPrototype:[CPSortDescriptor sortDescriptorWithKey:@"xref" ascending:YES]];
     [[xrefCol headerView] setStringValue:@"Cross References"];
     [xrefCol setWidth:rightWidth - 5];
     [xrefsTableView addTableColumn:xrefCol];
@@ -171,8 +172,9 @@
     [synScroll setAutohidesScrollers:YES];
 
     synonymsTableView = [[CPTableView alloc] initWithFrame:[synScroll bounds]];
-    var synCol = [[CPTableColumn alloc] initWithIdentifier:@"synonym"];
+    var synCol = [[CPTableColumn alloc] initWithIdentifier:@"label"];
     [[synCol headerView] setStringValue:@"Synonyms"];
+    [synCol setSortDescriptorPrototype:[CPSortDescriptor sortDescriptorWithKey:@"label" ascending:YES]];
     [synCol setWidth:rightWidth - 5];
     [synonymsTableView addTableColumn:synCol];
     [synonymsTableView setDataSource:self];
@@ -188,12 +190,14 @@
     
     var downIdCol = [[CPTableColumn alloc] initWithIdentifier:@"id"];
     [[downIdCol headerView] setStringValue:@"ID"];
+    [downIdCol setSortDescriptorPrototype:[CPSortDescriptor sortDescriptorWithKey:@"id" ascending:YES]];
     [downIdCol setWidth:80];
     [downstreamTableView addTableColumn:downIdCol];
 
     var downLabelCol = [[CPTableColumn alloc] initWithIdentifier:@"label"];
     [[downLabelCol headerView] setStringValue:@"Label"];
-    [downLabelCol setWidth:rightWidth - 85];
+    [downLabelCol setSortDescriptorPrototype:[CPSortDescriptor sortDescriptorWithKey:@"label" ascending:YES]];
+    [downLabelCol setWidth:rightWidth - 88];
     [downstreamTableView addTableColumn:downLabelCol];
 
     [downstreamTableView setDataSource:self];
@@ -217,6 +221,45 @@
 
     // 5. Kick off loading the root nodes
     [self fetchRoots];
+}
+
+- (void)tableView:(CPTableView)tableView sortDescriptorsDidChange:(CPArray)oldDescriptors
+{
+    // 1. Identify which array we are sorting
+    var arrayToSort = nil;
+    if (tableView === synonymsTableView) {
+        arrayToSort = _synonyms;
+    } else if (tableView === xrefsTableView) {
+        arrayToSort = _xrefs;
+    } else if (tableView === downstreamTableView) {
+        arrayToSort = _downstreamTerms;
+    }
+
+    if (!arrayToSort || [arrayToSort count] === 0)
+        return;
+
+    var descriptors = [tableView sortDescriptors];
+    var mainDescriptor = [descriptors objectAtIndex:0];
+    var key = [mainDescriptor key]; // e.g., "label" or "termId"
+    var ascending = [mainDescriptor ascending];
+debugger
+
+    // not possible: [arrayToSort sortUsingDescriptors:[tableView sortDescriptors]];
+    arrayToSort.sort(function(a, b) {
+        var valA = a[key];
+        var valB = b[key];
+
+        // Handle potential undefined values
+        if (valA === undefined) valA = "";
+        if (valB === undefined) valB = "";
+
+        if (valA < valB) return ascending ? -1 : 1;
+        if (valA > valB) return ascending ? 1 : -1;
+        return 0;
+    });
+
+
+    [tableView reloadData];
 }
 
 
@@ -420,7 +463,7 @@
     var item = [outlineView itemAtRow:selectedRow];
     var node = [item representedObject];
     
-    [definitionTextView setString: [node definition]  + ' (' + node.termId + ')' || @"No definition available."] ;
+    [definitionTextView setString: [node definition]  + ' (HP:' + [CPString stringWithFormat:"%07d", node.termId + 0] + ')' || @"No definition available."] ;
 
     [self fetchDownstreamForNode:node];
     [self fetchSynonymsForNode:node];

@@ -291,9 +291,71 @@
 - (void)nextMatch:(id)sender
 {
     if (!_matchedIndexPaths || _matchedIndexPaths.length === 0) return;
-    _currentMatchIndex++;
+        _currentMatchIndex++;
+
     if (_currentMatchIndex >= _matchedIndexPaths.length) _currentMatchIndex = 0;
-    [self updateSelectionToCurrentMatch];
+        [self updateSelectionToCurrentMatch];
+}
+
+- (void)setSearchStringResultValue:(CPString)val
+{
+    [self stopPulsatingAnimation];
+    [_searchStatusLabel setStringValue:val];
+}
+
+
+// Ensure this exists in AppController
+- (void)setSearchAlphaValue:(float)val
+{
+    [_searchStatusLabel setAlphaValue:val];
+}
+
+- (void)animationDidStop:(CAAnimation)anim finished:(BOOL)finished
+{
+    if (finished)
+    {
+        // We can check the current opacity of the label to decide the next step
+        var currentOpacity = [_searchStatusLabel alphaValue];
+
+        if (currentOpacity < 0.15) {
+            // We just faded out, now fade back in
+            [self startPulsatingAnimationWithDirection:0];
+        } else {
+            // We just faded in, now fade out
+            [self startPulsatingAnimationWithDirection:1];
+        }
+    }
+}
+
+- (void)startPulsatingAnimation
+{
+    [self startPulsatingAnimationWithDirection:0];
+}
+
+- (void)startPulsatingAnimationWithDirection:(int)direction
+{
+    var fromValue = (direction == 0) ? 0.0 : 0.8;
+    var toValue   = (direction == 0) ? 0.8 : 0.0;
+
+    [_searchStatusLabel setWantsLayer:YES];
+    var layer = [_searchStatusLabel layer];
+    [layer setDelegate:self];
+
+    var pulseAnimation = [CABasicAnimation animationWithKeyPath:@"searchAlphaValue"];
+    [pulseAnimation setDelegate:self];
+    [pulseAnimation setFromValue:fromValue];
+    [pulseAnimation setToValue:toValue];     // Fade down to 30% visibility
+    [pulseAnimation setDuration:0.6];    // 0.6 seconds per fade
+
+    // Attach the animation to the view's layer
+    [layer addAnimation:pulseAnimation forKey:@"searchAlphaValue"];
+}
+
+
+- (void)stopPulsatingAnimation
+{
+   [[_searchStatusLabel layer] removeAnimationForKey:@"searchAlphaValue"];
+   [self setSearchAlphaValue:1.0];
 }
 
 // --- Trigger Search ---
@@ -310,19 +372,27 @@
         [_searchStatusLabel setStringValue:@""];
         return;
     }
+
     CPLog("Suche läuft...");
+
     [_searchStatusLabel setStringValue:@"Searching..."];
+    [self startPulsatingAnimation];
 
     var urlString = "/DBB/hpo/search/" + encodeURIComponent(searchString) + "?nameOnly=" + (isNameOnly ? "1" : "0");
     var request = [CPURLRequest requestWithURL:urlString];
 
     [CPURLConnection sendAsynchronousRequest:request
                                        queue:[CPOperationQueue mainQueue]
-                           completionHandler:function(response, data, error) {
-                                if (!error && data) {
+                           completionHandler:function(response, data, error)
+                            {
+
+                                if (!error && data)
+                                {
                                     var json = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
                                     [self expandAndSelectPaths:json];
-                                } else {
+                                }
+                                else
+                                {
                                     CPLog("Fehler bei der Suche.");
                                     [_searchStatusLabel setStringValue:@"Error"];
                                 }
@@ -525,8 +595,10 @@
 // --- 4. Fixed Search Selection UI ---
 - (void)updateSelectionToCurrentMatch
 {
-    if (!_matchedIndexPaths || [_matchedIndexPaths count] === 0) {
-        [_searchStatusLabel setStringValue:@"0 of 0"];
+    if (!_matchedIndexPaths || [_matchedIndexPaths count] === 0)
+    {
+        [self setSearchStringResultValue:@"0 hits"];
+
         return;
     }
     
@@ -534,18 +606,21 @@
     
     // Iteratively expand parents
     var partialPath = [CPIndexPath indexPathWithIndex:[path indexAtPosition:0]];
-    for (var level = 1; level < [path length]; level++) {
+
+    for (var level = 1; level < [path length]; level++)
+    {
         var treeNode = [[treeController arrangedObjects] descendantNodeAtIndexPath:partialPath];
-        if (treeNode) {
+
+        if (treeNode)
             [outlineView expandItem:treeNode];
-        }
+
         partialPath = [partialPath indexPathByAddingIndex:[path indexAtPosition:level]];
     }
     
     // Select the target item
     [treeController setSelectionIndexPath:path];
-    [_searchStatusLabel setStringValue:(_currentMatchIndex + 1) + @" of " + [_matchedIndexPaths count]];
-    
+    [self setSearchStringResultValue:(_currentMatchIndex + 1) + @" of " + [_matchedIndexPaths count]];
+
     // Give the view layout engine time to create the visual rows before attempting to scroll to them
     setTimeout(function() {
         var node = [[treeController arrangedObjects] descendantNodeAtIndexPath:path];
@@ -568,7 +643,7 @@
         [treeController setSelectionIndexPaths:[]];
         _matchedIndexPaths = [];
         _currentMatchIndex = -1;
-        [_searchStatusLabel setStringValue:@"0 hits"];
+        [self setSearchStringResultValue:@"0 hits"];
         return;
     }
     

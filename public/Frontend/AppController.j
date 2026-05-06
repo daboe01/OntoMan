@@ -33,6 +33,12 @@
     // Search tracking
     CPArray          _matchedIndexPaths;
     int              _currentMatchIndex;
+
+    // Phenopacket Extractor UI elements
+    CPTextView       _reportInputTextView;
+    CPTextView       _phenopacketOutputTextView;
+    CPButton         _extractButton;
+    CPTextField      _extractStatusLabel;
 }
 
 - (void)applicationDidFinishLaunching:(CPNotification)aNotification
@@ -307,6 +313,12 @@
     [_extractButton setAction:@selector(extractPhenopacketAction:)];
     [tab2View addSubview:_extractButton];
 
+    _extractStatusLabel = [[CPTextField alloc] initWithFrame:CGRectMake(CGRectGetMaxX([_extractButton frame]) + 20, CGRectGetMinY([_extractButton frame]) + 5 , 200, 20)];
+    [_extractStatusLabel setStringValue:@""];
+    [_extractStatusLabel setAutoresizingMask:CPViewMaxXMargin | CPViewMinYMargin];
+    [_extractStatusLabel setAlignment:CPLeftTextAlignment];
+    [tab2View addSubview:_extractStatusLabel];
+
 
     // 5. Finalize setup & load the roots
     [theWindow orderFront:self];
@@ -314,14 +326,13 @@
 }
 
 // --- Phenopacket Extraction Action ---
+// --- Phenopacket Extraction Action ---
 - (void)extractPhenopacketAction:(id)sender
 {
     var narrativeText = [_reportInputTextView string];
 
-    if (!narrativeText ||[narrativeText length] === 0)
-    {
+    if (!narrativeText || [narrativeText length] === 0) {
         [_phenopacketOutputTextView setString:@"Please paste a medical report on the left before extracting."];
-
         return;
     }
 
@@ -329,7 +340,8 @@
     [_extractButton setTitle:@"Extracting..."];
     [_phenopacketOutputTextView setString:@"Extracting phenopacket, please wait..."];
 
-    // Adjust this endpoint URL according to your specific backend implementation
+    // Start animation
+
     var request = [CPURLRequest requestWithURL:"/DBB/extract_phenopacket"];
     [request setHTTPMethod:@"POST"];
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
@@ -339,22 +351,25 @@
     [request setHTTPBody:postData];
     [CPURLConnection sendAsynchronousRequest:request
                                        queue:[CPOperationQueue mainQueue]
-                           completionHandler:function(response, data, error) {
+                           completionHandler:function(response, data, error)
+    {
 
         [_extractButton setEnabled:YES];
         [_extractButton setTitle:@"Extract phenopacket"];
 
+        // Stop animation[self stopExtractPulsatingAnimation];
+        [_extractStatusLabel setStringValue:@""];
+
         if (!error && data) {
             try {
-                // Parse the incoming JSON and stringify it with 4 spaces for formatting
                 var parsedData = JSON.parse(data);
                 var prettyJSON = JSON.stringify(parsedData, null, 4);
                 [_phenopacketOutputTextView setString:prettyJSON];
             } catch (e) {
-                // Fallback to raw string if the backend does not return valid JSON[_phenopacketOutputTextView setString:data];
+                [_phenopacketOutputTextView setString:data];
             }
         } else {
-            var errorMsg = (error) ?[error localizedDescription] : @"Unknown error occurred.";
+            var errorMsg = (error) ? [error localizedDescription] : @"Unknown error occurred.";
             [_phenopacketOutputTextView setString:@"Failed to extract phenopacket:\n\n" + errorMsg];
             CPLog("Extraction Error: %@", error);
         }
@@ -496,17 +511,27 @@
 
 - (void)animationDidStop:(CAAnimation)anim finished:(BOOL)finished
 {
-    if (finished)
-    {
-        var currentOpacity = [_searchStatusLabel alphaValue];
+    if (!finished)
+        return;
 
-        if (currentOpacity < 0.15)
-            [self startPulsatingAnimationWithDirection:0];
-        else
-            [self startPulsatingAnimationWithDirection:1];
+    var animId = anim._animationID;
+
+    if (animId === @"searchPulse") {
+        var currentOpacity =[_searchStatusLabel alphaValue];
+        [self startPulsatingAnimationWithDirection:(currentOpacity < 0.15 ? 0 : 1)];
+    }
+    else if (animId === @"extractPulse") {
+        var currentOpacity = [_extractStatusLabel alphaValue];
+        [self startExtractPulsatingAnimationWithDirection:(currentOpacity < 0.15 ? 0 : 1)];
+    }
+    else {
+        // Fallback
+        var currentOpacity = [_searchStatusLabel alphaValue];
+        [self startPulsatingAnimationWithDirection:(currentOpacity < 0.15 ? 0 : 1)];
     }
 }
 
+// --- Search Animation ---
 - (void)startPulsatingAnimation
 {
     [self startPulsatingAnimationWithDirection:0];
@@ -522,18 +547,51 @@
     [layer setDelegate:self];
 
     var pulseAnimation = [CABasicAnimation animationWithKeyPath:@"searchAlphaValue"];
+    pulseAnimation._animationID = "searchPulse";
     [pulseAnimation setDelegate:self];
     [pulseAnimation setFromValue:fromValue];
     [pulseAnimation setToValue:toValue];
     [pulseAnimation setDuration:0.6];
-
     [layer addAnimation:pulseAnimation forKey:@"searchAlphaValue"];
 }
 
 - (void)stopPulsatingAnimation
 {
-    [[_searchStatusLabel layer] removeAnimationForKey:@"searchAlphaValue"];
-    [self setSearchAlphaValue:1.0];
+    [[_searchStatusLabel layer] removeAnimationForKey:@"searchAlphaValue"];[self setSearchAlphaValue:1.0];
+}
+
+// --- Extract Animation ---
+- (void)setExtractAlphaValue:(float)val
+{
+    [_extractStatusLabel setAlphaValue:val];
+}
+
+- (void)startExtractPulsatingAnimation
+{
+    [self startExtractPulsatingAnimationWithDirection:0];
+}
+
+- (void)startExtractPulsatingAnimationWithDirection:(int)direction
+{
+    var fromValue = (direction == 0) ? 0.0 : 0.8;
+    var toValue   = (direction == 0) ? 0.8 : 0.0;
+    [_extractStatusLabel setWantsLayer:YES];
+    var layer = [_extractStatusLabel layer];
+    [layer setDelegate:self];
+
+    var pulseAnimation = [CABasicAnimation animationWithKeyPath:@"extractAlphaValue"];
+    pulseAnimation._animationID = "extractPulse";
+    [pulseAnimation setDelegate:self];
+    [pulseAnimation setFromValue:fromValue];
+    [pulseAnimation setToValue:toValue];
+    [pulseAnimation setDuration:0.6];
+    [layer addAnimation:pulseAnimation forKey:@"extractAlphaValue"];
+}
+
+- (void)stopExtractPulsatingAnimation
+{
+    [[_extractStatusLabel layer] removeAnimationForKey:@"extractAlphaValue"];
+    [self setExtractAlphaValue:1.0];
 }
 
 // --- Delegate Method: Triggers when the user selects a row ---
@@ -569,7 +627,8 @@
     var request = [CPURLRequest requestWithURL:urlString];
     [CPURLConnection sendAsynchronousRequest:request
                                        queue:[CPOperationQueue mainQueue]
-                           completionHandler:function(response, data, error) {
+                           completionHandler:function(response, data, error)
+    {
         if (!error && data) {
             _downstreamTerms = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil] ||[];
         }

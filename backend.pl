@@ -348,7 +348,7 @@ helper map_to_hpo_async => sub {
 # =========================================================
 # ROUTE: Generate Phenopacket from Medical Report
 # =========================================================
-post '/api/extract_phenopacket' => sub {
+post '/DBB/extract_phenopacket' => sub {
     my $c = shift;
 
     # 1. Read input text

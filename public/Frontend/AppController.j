@@ -16,7 +16,9 @@
     // Search UI elements
     CPCheckBox       _nameOnlyCheckbox;
     CPTextField      _searchStatusLabel;
-    
+    CPTextField      _searchField;
+    CPPopover        _exportPopover;
+
     // Data stores
     CPArray          _allRoots;
     CPArray          _synonyms;
@@ -52,12 +54,12 @@
     var topWidth = CGRectGetWidth(bounds) - 40;
     var searchFieldWidth = topWidth - 270; // Reserve space for buttons/checkbox
 
-    var searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(20, 10, searchFieldWidth, 30)];
-    [searchField setAutoresizingMask:CPViewWidthSizable | CPViewMaxYMargin];
-    [searchField setPlaceholderString:@"Search terms, synonyms, defs..."];
-    [searchField setTarget:self];
-    [searchField setAction:@selector(searchAction:)];
-    [contentView addSubview:searchField];
+    _searchField = [[CPSearchField alloc] initWithFrame:CGRectMake(20, 10, searchFieldWidth, 30)];
+    [_searchField setAutoresizingMask:CPViewWidthSizable | CPViewMaxYMargin];
+    [_searchField setPlaceholderString:@"Search terms, synonyms, defs..."];
+    [_searchField setTarget:self];
+    [_searchField setAction:@selector(searchAction:)];
+    [contentView addSubview:_searchField];
 
     // Status Label ("1 of 5")
     _searchStatusLabel = [[CPTextField alloc] initWithFrame:CGRectMake(20 + searchFieldWidth + 10, 15, 60, 20)];
@@ -182,12 +184,22 @@
     [rightSplitView addSubview:synScroll];
 
     // SECTION 3.3: Downstream Codes TableView
-    var downScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, rightWidth, splitHeight * 0.30)];
+    var textBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.30)];
+    [textBox setTitle:@"Downstream Nodes"];[textBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+
+    var contentBounds = [[textBox contentView] bounds];
+
+    // Scrollview 34px kürzer machen, um Platz für den Button am unteren Rand zu schaffen
+    var downScroll = [[CPScrollView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(contentBounds), CGRectGetHeight(contentBounds) - 58)];
     [downScroll setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [downScroll setAutohidesScrollers:YES];
 
     downstreamTableView = [[CPTableView alloc] initWithFrame:[downScroll bounds]];
-    
+
+    // Doppelklick-Aktion aktivieren
+    [downstreamTableView setTarget:self];
+    [downstreamTableView setDoubleAction:@selector(doubleClickDownstream:)];
+
     var downIdCol = [[CPTableColumn alloc] initWithIdentifier:@"id"];
     [[downIdCol headerView] setStringValue:@"ID"];
     [downIdCol setSortDescriptorPrototype:[CPSortDescriptor sortDescriptorWithKey:@"id" ascending:YES]];
@@ -202,11 +214,15 @@
 
     [downstreamTableView setDataSource:self];
     [downScroll setDocumentView:downstreamTableView];
-
-    var textBox = [[CPBox alloc] initWithFrame:CGRectMake(0,0, rightWidth, splitHeight * 0.30)];
-    [textBox setTitle:@"Downstream Nodes"];
-    [textBox setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
     [[textBox contentView] addSubview:downScroll];
+
+    // Export IDs Button
+    var exportBtn = [[CPButton alloc] initWithFrame:CGRectMake(3, CGRectGetMaxY([downScroll bounds]) + 3, 120, 24)];
+    [exportBtn setAutoresizingMask:CPViewMinYMargin | CPViewMaxXMargin]; // Verankert den Button unten links
+    [exportBtn setTitle:@"Export IDs"];
+    [exportBtn setTarget:self];
+    [exportBtn setAction:@selector(exportDownstream:)];
+    [[textBox contentView] addSubview:exportBtn];
 
     [rightSplitView addSubview:textBox];
 
@@ -242,7 +258,6 @@
     var mainDescriptor = [descriptors objectAtIndex:0];
     var key = [mainDescriptor key]; // e.g., "label" or "termId"
     var ascending = [mainDescriptor ascending];
-debugger
 
     // not possible: [arrayToSort sortUsingDescriptors:[tableView sortDescriptors]];
     arrayToSort.sort(function(a, b) {
@@ -401,46 +416,6 @@ debugger
    [self setSearchAlphaValue:1.0];
 }
 
-// --- Trigger Search ---
-- (void)searchAction:(id)sender
-{
-    var searchString = [sender stringValue];
-    var isNameOnly = [_nameOnlyCheckbox state] === CPOnState;
-    
-    if (!searchString || [searchString length] === 0)
-    {
-        [treeController setSelectionIndexPaths:[]];
-        _matchedIndexPaths = [];
-        _currentMatchIndex = -1;
-        [_searchStatusLabel setStringValue:@""];
-        return;
-    }
-
-    CPLog("Suche läuft...");
-
-    [_searchStatusLabel setStringValue:@"Searching..."];
-    [self startPulsatingAnimation];
-
-    var urlString = "/DBB/hpo/search/" + encodeURIComponent(searchString) + "?nameOnly=" + (isNameOnly ? "1" : "0");
-    var request = [CPURLRequest requestWithURL:urlString];
-
-    [CPURLConnection sendAsynchronousRequest:request
-                                       queue:[CPOperationQueue mainQueue]
-                           completionHandler:function(response, data, error)
-                            {
-
-                                if (!error && data)
-                                {
-                                    var json = [CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                                    [self expandAndSelectPaths:json];
-                                }
-                                else
-                                {
-                                    CPLog("Fehler bei der Suche.");
-                                    [_searchStatusLabel setStringValue:@"Error"];
-                                }
-                            }];
-}
 
 // --- Delegate Method: Triggers when the user selects a row ---
 - (void)outlineViewSelectionDidChange:(CPNotification)notification
@@ -485,6 +460,124 @@ debugger
         }
         [downstreamTableView reloadData];
     }];
+}
+
+// --- Trigger Search ---
+- (void)searchAction:(id)sender
+{
+    var searchString = [sender stringValue];
+    var isNameOnly = [_nameOnlyCheckbox state] === CPOnState;
+    [self performSearchForString:searchString isNameOnly:isNameOnly];
+}
+
+- (void)performSearchForString:(CPString)searchString isNameOnly:(BOOL)isNameOnly
+{
+    if (!searchString || [searchString length] === 0)
+    {
+        [treeController setSelectionIndexPaths:[]];
+        _matchedIndexPaths = [];
+        _currentMatchIndex = -1;
+        [_searchStatusLabel setStringValue:@""];
+        return;
+    }
+
+    CPLog("Suche läuft nach: " + searchString);
+    [_searchStatusLabel setStringValue:@"Searching..."];
+    [self startPulsatingAnimation];
+
+    var urlString = "/DBB/hpo/search/" + encodeURIComponent(searchString) + "?nameOnly=" + (isNameOnly ? "1" : "0");
+    var request = [CPURLRequest requestWithURL:urlString];
+
+    [CPURLConnection sendAsynchronousRequest:request
+                                       queue:[CPOperationQueue mainQueue]
+                           completionHandler:function(response, data, error)
+     {
+        if (!error && data)
+        {
+            var json =[CPJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            [self expandAndSelectPaths:json];
+        }
+        else
+        {
+            CPLog("Fehler bei der Suche.");
+            [_searchStatusLabel setStringValue:@"Error"];
+        }
+    }];
+}
+
+// --- Downstream Features ---
+- (void)doubleClickDownstream:(id)sender
+{
+    var clickedRow = [downstreamTableView clickedRow];
+    if (clickedRow < 0 || clickedRow >= _downstreamTerms.length) return;
+
+    var term = _downstreamTerms[clickedRow];
+    var formattedId = "HP:" +[CPString stringWithFormat:"%07d", term.id + 0];
+
+    // Suche im UI aktualisieren (als Feedbeack für den User)
+    [_searchField setStringValue:formattedId];
+
+    // Wenn gezielt nach ID gesucht wird, Name-Only zur Sicherheit ausschalten
+    [_nameOnlyCheckbox setState:CPOffState];
+
+    // Suche anstoßen (Master-Tree selektiert den Eintrag anschließend automatisch)
+    [self performSearchForString:formattedId isNameOnly:NO];
+}
+
+- (void)exportDownstream:(id)sender
+{
+    if (!_downstreamTerms || _downstreamTerms.length === 0) return;
+
+    // String für den Export zusammenbauen (Zero-Padded HP IDs)
+    var textToExport = "";
+    for (var i = 0; i < _downstreamTerms.length; i++) {
+        var termId = _downstreamTerms[i].id;
+        var formatted = "HP:" +[CPString stringWithFormat:"%07d", termId + 0];
+        textToExport += formatted + "\n";
+    }
+
+    // Popover beim ersten Aufruf initialisieren
+    if (!_exportPopover)
+    {
+        _exportPopover = [CPPopover new];
+        [_exportPopover setBehavior:CPPopoverBehaviorTransient];
+        [_exportPopover setAppearance:CPPopoverAppearanceMinimal];
+        [_exportPopover setAnimates:YES];
+
+        // Container View für das Popover mit fester Größe definieren
+        var containerView = [[CPView alloc] initWithFrame:CGRectMake(0, 0, 250, 350)];
+
+        // ScrollView
+        var scrollView = [[CPScrollView alloc] initWithFrame:[containerView bounds]];
+        [scrollView setAutoresizingMask:CPViewWidthSizable | CPViewHeightSizable];
+        [scrollView setAutohidesScrollers:YES];
+
+        // Selectable TextView einbauen (als Instanzvariable, damit wir den Text updaten können)
+        _exportTextView = [[CPTextView alloc] initWithFrame:[scrollView bounds]];
+        [_exportTextView setAutoresizingMask:CPViewWidthSizable];
+        [_exportTextView setEditable:NO];
+        [_exportTextView setSelectable:YES];
+
+        [scrollView setDocumentView:_exportTextView];[containerView addSubview:scrollView];
+
+        // View Controller anbinden
+        var myViewController =[CPViewController new];
+        [myViewController setView:containerView];
+        [_exportPopover setContentViewController:myViewController];
+    }
+
+    // Text für den aktuellen Datensatz aktualisieren
+    [_exportTextView setString:textToExport];
+
+    // Popover relativ zum geklickten Button ("sender") anzeigen.
+    // CPMaxYEdge oder CPMinYEdge sorgen dafür, dass das Popover über oder unter dem Button aufpoppt.
+    [_exportPopover showRelativeToRect:[sender bounds] ofView:sender preferredEdge:CPMinYEdge];
+
+    // Den Text automatisch markieren, damit der Nutzer nur noch CMD+C drücken muss.
+    // Ein kurzes Timeout ist manchmal nötig, damit der View schon vollständig gerendert ist.
+    window.setTimeout(function() {
+        [_exportTextView selectAll:self];
+    }, 50);
 }
 
 - (void)fetchSynonymsForNode:(HPONode)node
@@ -752,8 +845,8 @@ debugger
     {
         termId = dict.id;
         name = dict.label;
-        definition = dict.definition || @""; // Automatically parsed from JSON data if available
-        
+        definition = dict.definition || dict.label;
+
         // is_leaf is 0 for nodes with children, 1 for actual leaves
         isLeaf = (dict.is_leaf == 1); 
         

@@ -37,15 +37,27 @@ get '/DBB/hpo/search/:query' => sub {
     my $self = shift;
     my $query = $self->param('query');
     my $name_only = $self->param('nameOnly') || '0'; # Read NameOnly flag (default: 0)
-    my $search_term = "%$query%";
 
-    my $base_where = "WHERE t.label ILIKE ?";
-    my @bind_params = ($search_term);
+    my $base_where;
+    my @bind_params;
 
-    # If the Name Only flag wasn't set, expand the search to definitions and synonyms
-    if ($name_only eq 'false' || $name_only eq '0') {
-        $base_where = "WHERE t.label ILIKE ? OR t.definition ILIKE ? OR EXISTS (SELECT 1 FROM public.synonyms s WHERE s.idterm = t.id AND s.label ILIKE ?)";
-        push @bind_params, $search_term, $search_term;
+    # NEU: Prüfen, ob die Suchanfrage das Format HP:1234567 hat (case-insensitive)
+    if ($query =~ /^hp:0*(\d+)$/i) {
+        my $numeric_id = $1; # Führende Nullen werden durch 0* ignoriert
+        $base_where = "WHERE t.id = ?";
+        @bind_params = ($numeric_id);
+    } 
+    else {
+        # Bisheriges Verhalten: Normale Textsuche mit Wildcards
+        my $search_term = "%$query%";
+        $base_where = "WHERE t.label ILIKE ?";
+        @bind_params = ($search_term);
+
+        # Wenn "Name Only" aus ist, in Definitionen und Synonymen mitsuchen
+        if ($name_only eq 'false' || $name_only eq '0') {
+            $base_where = "WHERE t.label ILIKE ? OR t.definition ILIKE ? OR EXISTS (SELECT 1 FROM public.synonyms s WHERE s.idterm = t.id AND s.label ILIKE ?)";
+            push @bind_params, $search_term, $search_term;
+        }
     }
 
     # HPO is a DAG. We resolve exactly ONE valid path towards the root for each hit.

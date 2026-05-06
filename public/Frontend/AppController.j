@@ -341,6 +341,8 @@
     [_phenopacketOutputTextView setString:@"Extracting phenopacket, please wait..."];
 
     // Start animation
+    [_extractStatusLabel setStringValue:@"Extracting..."];
+    [self startExtractPulsatingAnimation];
 
     var request = [CPURLRequest requestWithURL:"/DBB/extract_phenopacket"];
     [request setHTTPMethod:@"POST"];

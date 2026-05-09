@@ -12,6 +12,7 @@ use Apache::Session::File;
 use Encode;
 use Mojo::JSON qw(decode_json encode_json);
 use DBIx::Connector;
+use POSIX qw(strftime);
 
 no warnings 'uninitialized';
 
@@ -280,9 +281,9 @@ my $VECTORSTORE_BASE_URL = $ENV{VECTORSTORE_URL} // 'http://localhost:3036';
 # GLOBAL CONFIG CONSTANTS
 # ==========================================
 use constant {
-    LLM_PHENOTYPE_EXTRACTION_PROMPT_ID   => 100, # Prompt ID für die initiale Extraktion
-    LLM_HPO_RETRIEVAL_PROMPT_ID          => 101, # Standard HPO Vectorstore (Phänotypen, Onset, Severity)
-    LLM_HPO_MODIFIER_RETRIEVAL_PROMPT_ID => 102, # NEU: Separater Vectorstore für Modifiers
+    LLM_PHENOTYPE_EXTRACTION_PROMPT_ID   => 50, # Prompt ID für die initiale Extraktion
+    LLM_HPO_RETRIEVAL_PROMPT_ID          => 51, # Standard HPO Vectorstore (Phänotypen, Onset, Severity)
+    LLM_HPO_MODIFIER_RETRIEVAL_PROMPT_ID => 52, # NEU: Separater Vectorstore für Modifiers
 };
 
 # Disable Keep-Alive caching for massive parallel requests
@@ -319,20 +320,20 @@ helper map_to_hpo_async => sub {
     my $prompt_id = $is_modifier ? LLM_HPO_MODIFIER_RETRIEVAL_PROMPT_ID : LLM_HPO_RETRIEVAL_PROMPT_ID;
     my $url_retrieve = "$VECTORSTORE_BASE_URL/LLM/run_stateless/" . $prompt_id;
 
-    return $ua->post_p($url_retrieve => {Accept => '*/*'} => encode('UTF-8', "[\"$term\"]"))->then(sub {
+    return $ua->post_p($url_retrieve => {Accept => '*/*'} => encode('UTF-8', $term))->then(sub {
         my $tx = shift;
         if ($tx->result && $tx->result->is_success) {
+
             my $matches = eval { decode_json($tx->result->body) } // [ ];
 
-            # Vectorstore returns: [{"id": "1558", "label": "Mapped Term"}, ...]
-            if (ref $matches eq 'ARRAY' && @$matches && defined $matches->[0]->{id}) {
+            # Vectorstore returns:[{"id": "1558", "label": "Mapped Term"}, ...]
+            if (ref $matches eq 'ARRAY' && @$matches && defined $matches->[0]->{label}) {
 
                 # Formatierung der nackten ID in eine valide HP-ID
-                my $formatted_id = $self->format_hpo_id($matches->[0]->{id});
-
+                my $formatted_id = $self->format_hpo_id($matches->[0]->{label});
                 return {
                     id    => $formatted_id,
-                    label => $matches->[0]->{label} // $term
+                    label => $matches->[0]->{payload} // $term
                 };
             }
         }
@@ -353,7 +354,7 @@ post '/DBB/extract_phenopacket' => sub {
 
     # 1. Read input text
     my $payload = $c->req->json;
-    my $text_content = $payload->{medical_report} // '';
+    my $text_content = $payload->{medical_report} // $payload->{report} // '';
 
     unless ($text_content) {
         return $c->render(json => { error => "Missing 'medical_report' in JSON body" }, status => 400);
@@ -363,7 +364,6 @@ post '/DBB/extract_phenopacket' => sub {
 
     # 2. Call Extraction LLM
     $c->render_later;
-
     $ua->post_p($url_extract => {Accept => '*/*'} => encode('UTF-8', $text_content))->then(sub {
         my $tx_extract = shift;
 
@@ -414,13 +414,27 @@ post '/DBB/extract_phenopacket' => sub {
                     }
                 }
 
-                # Wait for all sub-attributes to resolve
-                return Mojo::Promise->all(@sub_promises)->then(sub {
-                    return $mapped_feature;
-                });
+                # Filter undefined entries to prevent "clone on undefined value" in Mojo::Promise
+                @sub_promises = grep { defined $_ } @sub_promises;
+
+                # Wait for all sub-attributes to resolve (Skip if empty)
+                if (@sub_promises) {
+                    return Mojo::Promise->all(@sub_promises)->then(sub {
+                        return $mapped_feature;
+                    });
+                } else {
+                    return Mojo::Promise->resolve($mapped_feature);
+                }
             });
 
             push @feature_promises, $feat_promise;
+        }
+
+        # Filter undefined entries to prevent "clone on undefined value"
+        @feature_promises = grep { defined $_ } @feature_promises;
+
+        if (!@feature_promises) {
+            return $c->render(json => { error => "No phenotypic features extracted." }, status => 400);
         }
 
         # 4. Wait for ALL feature mapping to complete

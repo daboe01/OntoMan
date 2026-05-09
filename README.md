@@ -1,13 +1,3 @@
-
-
-
-
-Hier ist das aktualisierte README. Ich habe die neuen Funktionen für den **KI-gestützten Phenopacket Extractor** basierend auf deinem Quellcode hinzugefügt. 
-
-Dabei habe ich die Liste der Features ergänzt, die neuen Umgebungsvariablen (`VECTORSTORE_URL`) bei den Voraussetzungen und Startbedingungen dokumentiert sowie den neuen `POST`-Endpunkt inklusive eines Beispiels aufgenommen.
-
-***
-
 # 🧬 Human Phenotype Ontology (HPO) Browser & Phenopacket Extractor
 
 A full-stack, desktop-class web application for navigating, searching, and inspecting the [Human Phenotype Ontology (HPO)](https://hpo.jax.org/). 

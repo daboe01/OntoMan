@@ -275,7 +275,7 @@ del '/DBB/:table/:pk/:key'=> [key=>qr/\d+/] => sub
 
 
 # Allow ENV override, fallback to localhost
-my $VECTORSTORE_BASE_URL = $ENV{VECTORSTORE_URL} // 'http://localhost:3036';
+my $VECTORSTORE_BASE_URL = $ENV{VECTORSTORE_URL} // 'http://10.210.21.201:3036';
 
 # ==========================================
 # GLOBAL CONFIG CONSTANTS
@@ -284,6 +284,7 @@ use constant {
     LLM_PHENOTYPE_EXTRACTION_PROMPT_ID   => 50, # Prompt ID für die initiale Extraktion
     LLM_HPO_RETRIEVAL_PROMPT_ID          => 51, # Standard HPO Vectorstore (Phänotypen, Onset, Severity)
     LLM_HPO_MODIFIER_RETRIEVAL_PROMPT_ID => 52, # NEU: Separater Vectorstore für Modifiers
+    LLM_ICD10_EXTRACTION_PROMPT_ID       => 54, # ICD-10 Extraktion
 };
 
 # Disable Keep-Alive caching for massive parallel requests
@@ -482,6 +483,42 @@ post '/DBB/extract_phenopacket' => sub {
     });
 };
 
+# =========================================================
+# ROUTE: Extract ICD-10 from Medical Report
+# =========================================================
+post '/DBB/extract_icd10' => sub {
+    my $c = shift;
+
+    # 1. Read input text
+    my $payload = $c->req->json;
+    my $text_content = $payload->{medical_report} // $payload->{report} // '';
+
+    unless ($text_content) {
+        return $c->render(json => { error => "Missing 'report' in JSON body" }, status => 400);
+    }
+
+    my $url_extract = "$VECTORSTORE_BASE_URL/LLM/run_stateless/" . LLM_ICD10_EXTRACTION_PROMPT_ID;
+
+    # 2. Call Extraction LLM
+    $c->render_later;
+    $ua->post_p($url_extract => {Accept => '*/*'} => encode('UTF-8', $text_content))->then(sub {
+        my $tx_extract = shift;
+
+        unless ($tx_extract->result && $tx_extract->result->is_success) {
+            die "ICD-10 Extraction LLM Failed: " . ($tx_extract->result ? $tx_extract->result->message : 'Unknown Error');
+        }
+
+        # Parse extracted JSON (erwartet ein Array bei ID 54)
+        my $extracted_data = eval { decode_json($tx_extract->result->body) } //[];
+
+        $c->render(json => $extracted_data);
+
+    })->catch(sub {
+        my $err = shift;
+        $c->app->log->error("Error during ICD-10 Extraction: $err");
+        $c->render(json => { error => "Pipeline failed", details => "$err" }, status => 500);
+    });
+};
 
 
 ###################################################################

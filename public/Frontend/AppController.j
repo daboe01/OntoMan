@@ -38,6 +38,7 @@
     CPTextView       _reportInputTextView;
     CPTextView       _phenopacketOutputTextView;
     CPButton         _extractButton;
+    CPButton         _extractICD10Button;
     CPTextField      _extractStatusLabel;
 }
 
@@ -254,7 +255,7 @@
     // TAB 2: Phenopacket Extractor
     // ==========================================
     var tab2 = [[CPTabViewItem alloc] initWithIdentifier:@"tab2"];
-    [tab2 setLabel:@"Phenopacket Extractor"];
+    [tab2 setLabel:@"Phenopacket / ICD Extractor"];
     var tab2View = [[CPView alloc] initWithFrame:bounds];
     [tab2 setView:tab2View];
     [tabView addTabViewItem:tab2];
@@ -313,19 +314,24 @@
     [_extractButton setAction:@selector(extractPhenopacketAction:)];
     [tab2View addSubview:_extractButton];
 
-    _extractStatusLabel = [[CPTextField alloc] initWithFrame:CGRectMake(CGRectGetMaxX([_extractButton frame]) + 20, CGRectGetMinY([_extractButton frame]) + 5 , 200, 20)];
+    _extractICD10Button = [[CPButton alloc] initWithFrame:CGRectMake(210, CGRectGetMaxY([extractorSplit frame]) + 15, 150, 30)];
+    [_extractICD10Button setTitle:@"Extract ICD-10"];[_extractICD10Button setAutoresizingMask:CPViewMinYMargin | CPViewMaxXMargin];
+    [_extractICD10Button setTarget:self];
+    [_extractICD10Button setAction:@selector(extractICD10Action:)];
+    [tab2View addSubview:_extractICD10Button];
+
+    // Status Label rutscht jetzt hinter den ICD-10 Button
+    _extractStatusLabel = [[CPTextField alloc] initWithFrame:CGRectMake(CGRectGetMaxX([_extractICD10Button frame]) + 20, CGRectGetMinY([_extractButton frame]) + 5 , 200, 20)];
     [_extractStatusLabel setStringValue:@""];
     [_extractStatusLabel setAutoresizingMask:CPViewMaxXMargin | CPViewMinYMargin];
     [_extractStatusLabel setAlignment:CPLeftTextAlignment];
     [tab2View addSubview:_extractStatusLabel];
-
 
     // 5. Finalize setup & load the roots
     [theWindow orderFront:self];
     [self fetchRoots];
 }
 
-// --- Phenopacket Extraction Action ---
 // --- Phenopacket Extraction Action ---
 - (void)extractPhenopacketAction:(id)sender
 {
@@ -373,6 +379,60 @@
         } else {
             var errorMsg = (error) ? [error localizedDescription] : @"Unknown error occurred.";
             [_phenopacketOutputTextView setString:@"Failed to extract phenopacket:\n\n" + errorMsg];
+            CPLog("Extraction Error: %@", error);
+        }
+    }];
+}
+
+// --- ICD-10 Extraction Action ---
+- (void)extractICD10Action:(id)sender
+{
+    var narrativeText = [_reportInputTextView string];
+
+    if (!narrativeText || [narrativeText length] === 0) {
+        [_phenopacketOutputTextView setString:@"Please paste a medical report on the left before extracting."];
+        return;
+    }
+
+    // Buttons während des Ladens deaktivieren[_extractButton setEnabled:NO];
+    [_extractICD10Button setEnabled:NO];[_extractICD10Button setTitle:@"Extracting..."];
+    [_phenopacketOutputTextView setString:@"Extracting ICD-10 codes, please wait..."];
+
+    // Start animation
+    [_extractStatusLabel setStringValue:@"Extracting..."];
+    [self startExtractPulsatingAnimation];
+
+    var request =[CPURLRequest requestWithURL:"/DBB/extract_icd10"];
+    [request setHTTPMethod:@"POST"];[request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+
+    var payload = { "report": narrativeText };
+    var postData = [CPString stringWithString:JSON.stringify(payload)];
+    [request setHTTPBody:postData];
+    [CPURLConnection sendAsynchronousRequest:request
+                                       queue:[CPOperationQueue mainQueue]
+                           completionHandler:function(response, data, error)
+    {
+        // Buttons wieder aktivieren
+        [_extractButton setEnabled:YES];
+        [_extractICD10Button setEnabled:YES];
+        [_extractICD10Button setTitle:@"Extract ICD-10"];
+
+        // Stop animation
+        [self stopExtractPulsatingAnimation];
+        [_extractStatusLabel setStringValue:@""];
+
+        if (!error && data) {
+            try {
+                var parsedData = JSON.parse(data);
+                // Gibt das JSON formatiert in der rechten Box aus
+                var prettyJSON = JSON.stringify(parsedData, null, 4);
+                [_phenopacketOutputTextView setString:prettyJSON];
+            } catch (e) {
+                [_phenopacketOutputTextView setString:data];
+            }
+        } else {
+            var errorMsg = (error) ? [error localizedDescription] : @"Unknown error occurred.";
+            [_phenopacketOutputTextView setString:@"Failed to extract ICD-10:\n\n" + errorMsg];
             CPLog("Extraction Error: %@", error);
         }
     }];
